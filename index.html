@@ -1,3 +1,63 @@
+A "yellow screen" is actually a good sign—it means your CSS (the background gradient) is loading, but the **JavaScript is crashing** before it can draw the rest of the game.
+
+When the JavaScript fails, the code stops running, so your images and text never get placed on the screen. Here is how to fix the common culprits for this specific crash:
+
+### 1. Fix the "Broken Data" Crash
+
+The most common cause for a blank screen is when the code tries to `parseInt` or `json.loads` data that isn't there yet. If the URL doesn't have the `?score=...` parameters, the game doesn't know what to do and freezes.
+
+**Update this section in your `index.html` script:**
+
+```javascript
+// This 'Safe Load' version prevents the game from crashing if data is missing
+const params = new URLSearchParams(window.location.search);
+
+// Use || 0 or || 1000 so there is ALWAYS a fallback number
+let score = parseInt(params.get('score')) || 0;
+let maxEnergy = parseInt(params.get('max_energy')) || 1000;
+let tapPower = parseInt(params.get('tap_power')) || 1;
+let energy = maxEnergy;
+
+// Check if elements exist before trying to update them
+function updateUI() {
+    const scoreEl = document.getElementById('score');
+    const energyValEl = document.getElementById('energy-val');
+    
+    if (scoreEl) scoreEl.innerText = score.toLocaleString();
+    if (energyValEl) energyValEl.innerText = Math.floor(energy);
+    
+    // Update the bar only if it exists
+    const bar = document.getElementById('energy-bar');
+    if (bar) bar.style.width = (energy / maxEnergy * 100) + "%";
+}
+
+```
+
+---
+
+### 2. Check for "Hidden" Syntax Errors
+
+If you accidentally deleted a bracket `}` or a semicolon `;` when pasting the code, the whole file will fail to run.
+
+* **The Browser Console:** Open your game URL in **Chrome** on your computer. Right-click anywhere and hit **Inspect** > **Console**.
+* **Look for Red Text:** It will tell you exactly which line has the error (e.g., `Uncaught SyntaxError: Unexpected token`).
+
+---
+
+### 3. Verification of `face.png` and `coin.png`
+
+If the script is looking for those files and can't find them, sometimes the loading process hangs.
+
+* Ensure the filenames in your code match the filenames on GitHub **exactly** (no capitals).
+* If you renamed them on GitHub, you **must** update the `src="filename.png"` in your HTML code.
+
+---
+
+### 🚀 The "Fresh Start" Code
+
+If you want to clear the deck and fix the yellow screen immediately, copy this **Clean Version** of the `index.html`. It includes "Safety Checks" to ensure it loads even if the bot fails to send data:
+
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -51,3 +111,7 @@
     </script>
 </body>
 </html>
+
+```
+
+**Would you like me to show you how to check the Render logs to see if your `bot.py` is sending the correct URL to the game?**
