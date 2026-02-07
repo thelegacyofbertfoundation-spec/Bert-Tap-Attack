@@ -9,29 +9,26 @@
         body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
         #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
-        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
         #face:active { transform: scale(0.94); }
-        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
+        .btn-group { display: none; gap: 10px; margin-top: 30px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f7dc6f; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #loader { font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="loader">
-        <h2>Loading Bert...</h2>
-        <p>Syncing with CloudStorage</p>
-    </div>
+    <div id="loader">Waking up Bert...</div>
 
-    <div id="score-container">
+    <div id="score-container" style="display:none;">
         <img src="coin.png" id="coin-icon">
         <span id="score">0</span>
     </div>
     
     <img id="face" src="face.png">
 
-    <div class="btn-group">
-        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+    <div class="btn-group" id="ui-buttons">
+        <button class="btn" onclick="syncRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
     </div>
 
@@ -45,11 +42,15 @@
         // LOAD DATA ON STARTUP
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
-                // If cloud is empty, score stays at 0. No more 5349!
+                // If cloud is empty, it defaults to 0. This kills the 5349 bug.
                 score = Number(values.score) || 0;
                 tapPower = Number(values.tapPower) || 1;
             }
+            // Show Game UI
             document.getElementById('loader').style.display = 'none';
+            document.getElementById('score-container').style.display = 'block';
+            document.getElementById('face').style.display = 'block';
+            document.getElementById('ui-buttons').style.display = 'flex';
             updateUI();
         });
 
@@ -63,18 +64,15 @@
             updateUI();
         };
 
-        function syncAndRank() {
-            // 1. Save locally to CloudStorage first
+        function syncRank() {
+            // 1. Save to CloudStorage
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    // 2. Send data to Bot via a JSON signal
-                    // This is the trigger for 'handle_web_app_data' in bot.py
+                    // 2. Send to Bot for Leaderboard
                     tg.sendData(JSON.stringify({ "score": score }));
-                } else {
-                    tg.showAlert("Cloud sync failed. Check connection.");
                 }
             });
         }
