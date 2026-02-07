@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Viral Tap Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { text-align: center; background: #1a1a1a; color: white; font-family: sans-serif; }
+        #coin { font-size: 100px; cursor: pointer; user-select: none; transition: transform 0.1s; }
+        #coin:active { transform: scale(0.9); }
+    </style>
+</head>
+<body>
+    <h1>Tap the Coin!</h1>
+    <div id="coin">🪙</div>
+    <h2 id="score">0</h2>
+
+    <script>
+        let score = 0;
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Make it full screen
+
+        document.getElementById('coin').onclick = () => {
+            score++;
+            document.getElementById('score').innerText = score;
+            // Send score to backend periodically or on close
+            tg.HapticFeedback.impactOccurred('medium');
+        };
+    </script>
+</body>
+</html>
