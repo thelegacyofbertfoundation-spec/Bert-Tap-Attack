@@ -1,62 +1,73 @@
 import os
+import sqlite3
+import json
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
-# Replace with your GitHub Pages URL (e.g., https://username.github.io/repo/)
-GAME_URL = "https://your-username.github.io/your-repo-name/" 
-# Render will pull this from your Environment Variables
+# IMPORTANT: Ensure this matches your GitHub Pages URL exactly!
+GITHUB_URL = "https://your-username.github.io/your-repo-name/" 
 TOKEN = os.getenv('BOT_TOKEN')
 
-# Enable logging to monitor bot activity in Render logs
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 
+# --- Database Logic ---
+def init_db():
+    conn = sqlite3.connect('players.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (user_id INTEGER PRIMARY KEY, score INTEGER, max_e INTEGER, tap_p INTEGER)''')
+    conn.commit()
+    conn.close()
+
+def get_player(user_id):
+    conn = sqlite3.connect('players.db')
+    c = conn.cursor()
+    c.execute("SELECT score, max_e, tap_p FROM users WHERE user_id=?", (user_id,))
+    res = c.fetchone()
+    conn.close()
+    return res if res else (0, 1000, 1)
+
+def save_player(user_id, score, max_e, tap_p):
+    conn = sqlite3.connect('players.db')
+    c = conn.cursor()
+    c.execute("REPLACE INTO users VALUES (?, ?, ?, ?)", (user_id, score, max_e, tap_p))
+    conn.commit()
+    conn.close()
+
+# --- Bot Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Sends the welcome message and the 'Play' button.
-    The game will automatically load progress from Telegram Cloud Storage.
-    """
-    user_name = update.effective_user.first_name
+    user_id = update.effective_user.id
+    score, max_e, tap_p = get_player(user_id)
     
-    # Create the button that launches your GitHub-hosted game
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                text="🎮 Start Tapping!", 
-                web_app=WebAppInfo(url=GAME_URL)
-            )
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
+    # Passing saved data into the URL
+    # This prevents the 404 by ensuring the URL is clean
+    full_url = f"{GITHUB_URL}?score={score}&max_energy={max_e}&tap_power={tap_p}"
+    
+    # 1. This creates a button in the chat message
+    keyboard = [[InlineKeyboardButton("🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=full_url))]]
+    
     await update.message.reply_text(
-        f"Hi {user_name}! 🚀\n\n"
-        "Welcome to your Viral Tapper. Your progress is now "
-        "automatically saved to your Telegram account.\n\n"
-        "Ready to earn some coins?",
-        reply_markup=reply_markup
+        f"Hey {update.effective_user.first_name}! Your balance: 💰 {score}\n\n"
+        "Tap the button below to start poking!",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-def main():
-    """Starts the bot."""
-    if not TOKEN:
-        print("ERROR: BOT_TOKEN is missing! Check your Render environment variables.")
-        return
+async def handle_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        data = json.loads(update.effective_message.web_app_data.data)
+        user_id = update.effective_user.id
+        save_player(user_id, data['score'], data['maxEnergy'], data['tapPower'])
+        await update.message.reply_text(f"✅ Sync complete! Balance: {data['score']} 💰")
+    except Exception as e:
+        logging.error(f"Save error: {e}")
 
-    # Build the application using your Bot Token
-    app = Application.builder().token(TOKEN).build()
-
-    # Handle the /start command
-    app.add_handler(CommandHandler("start", start))
-
-    print("Bot is live and running...")
-
-    # drop_pending_updates=True ensures the bot starts clean without 409 Conflicts
-    app.run_polling(drop_pending_updates=True)
-
+# --- Main ---
 if __name__ == '__main__':
-    main()
+    init_db()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_save))
+    print("Bot is running...")
+    app.run_polling()
