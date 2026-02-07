@@ -13,7 +13,7 @@
         #face:active { transform: scale(0.94); }
         .btn-group { display: none; gap: 10px; margin-top: 30px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        #loader { font-weight: bold; }
+        #loader { font-weight: bold; font-size: 1.2rem; }
     </style>
 </head>
 <body>
@@ -39,14 +39,14 @@
         let score = 0;
         let tapPower = 1;
 
-        // LOAD DATA ON STARTUP
+        // LOAD DATA FROM CLOUD
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
-                // If cloud is empty, it defaults to 0. This kills the 5349 bug.
+                // If cloud is empty, it stays 0.
                 score = Number(values.score) || 0;
                 tapPower = Number(values.tapPower) || 1;
             }
-            // Show Game UI
+            // Transition from Loader to Game
             document.getElementById('loader').style.display = 'none';
             document.getElementById('score-container').style.display = 'block';
             document.getElementById('face').style.display = 'block';
@@ -65,14 +65,17 @@
         };
 
         function syncRank() {
-            // 1. Save to CloudStorage
+            // 1. Save to CloudStorage first
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    // 2. Send to Bot for Leaderboard
+                    // 2. Send JSON to Bot. 
+                    // This ONLY works if you launched via the Reply Keyboard or Menu Button.
                     tg.sendData(JSON.stringify({ "score": score }));
+                } else {
+                    tg.showAlert("Cloud sync failed.");
                 }
             });
         }
