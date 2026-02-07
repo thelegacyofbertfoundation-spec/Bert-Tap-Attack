@@ -3,86 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Turbo Tapper - Viral Mini App</title>
+    <title>Turbo Tapper - Full Version</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bg-dark: #0a0a0a;
-            --tg-green: #31b545;
-            --gold: #f1c40f;
-            --blue: #3498db;
-            --card-bg: #1c1c1e;
-        }
-
-        body {
-            background: radial-gradient(circle at center, #1c1c1e 0%, var(--bg-dark) 100%);
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            text-align: center;
-            margin: 0;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px 0;
-            box-sizing: border-box;
-            user-select: none;
-        }
-
-        /* Top Stats Area */
-        #header { margin-top: 10px; }
-        #score-container {
-            font-size: 3.8rem;
-            font-weight: 800;
-            margin: 0;
-            text-shadow: 0 0 20px rgba(241, 196, 15, 0.3);
-        }
-        #stats-text { color: #888; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Main Game Area */
-        #game-area { flex-grow: 1; display: flex; align-items: center; justify-content: center; position: relative; }
-        
-        #coin-wrapper {
-            position: relative;
-            touch-action: manipulation;
-            transition: transform 0.05s ease;
-        }
+        :root { --bg: #0f0f0f; --accent: #31b545; --gold: #f1c40f; }
+        body { background: radial-gradient(circle, #1a1a1a, #000); color: white; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+        #score-container { font-size: 3rem; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+        #coin-wrapper { cursor: pointer; transition: transform 0.05s; touch-action: manipulation; margin: 20px; }
         #coin-wrapper:active { transform: scale(0.95); }
-        
-        #coin-img {
-            width: 240px;
-            height: 240px;
-            border-radius: 50%;
-            filter: drop-shadow(0 0 40px rgba(241, 196, 15, 0.4));
-            pointer-events: none;
+        #coin { width: 200px; height: 200px; filter: drop-shadow(0 0 20px var(--gold)); }
+        #energy-container { width: 250px; height: 12px; background: #333; border-radius: 10px; overflow: hidden; margin-top: 20px; border: 1px solid #444; }
+        #energy-bar { width: 100%; height: 100%; background: linear-gradient(90deg, var(--gold), #e67e22); transition: width 0.2s; }
+        .btn { background: #222; color: #aaa; border: 1px solid #444; padding: 10px 20px; border-radius: 20px; margin-top: 20px; cursor: pointer; font-size: 0.8rem; }
+        .particle { position: absolute; color: var(--gold); font-weight: bold; pointer-events: none; animation: float 0.6s ease-out forwards; }
+        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="score-container">💰 <span id="score">0</span></div>
+    <div id="coin-wrapper"><img id="coin" src="https://img.icons8.com/emoji/256/gold-coin-emoji.png"></div>
+    
+    <div id="energy-container"><div id="energy-bar"></div></div>
+    <div style="font-size: 0.8rem; margin-top: 5px;">⚡ <span id="energy-val">1000</span> / <span id="energy-max">1000</span></div>
+
+    <button class="btn" onclick="saveData()">☁️ Save & Exit</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let score = 0, energy = 1000, maxEnergy = 1000, tapPower = 1;
+
+        // LOAD DATA FROM URL (The bot will pass data here)
+        const urlParams = new URLSearchParams(window.location.search);
+        score = parseInt(urlParams.get('score')) || 0;
+        maxEnergy = parseInt(urlParams.get('max_energy')) || 1000;
+        tapPower = parseInt(urlParams.get('tap_power')) || 1;
+        energy = maxEnergy;
+
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+            document.getElementById('energy-val').innerText = energy;
+            document.getElementById('energy-max').innerText = maxEnergy;
+            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
         }
 
-        /* Bottom Controls */
-        #footer { width: 100%; padding: 0 20px; box-sizing: border-box; }
-        
-        .energy-section { margin-bottom: 25px; }
-        #energy-container {
-            width: 100%;
-            height: 14px;
-            background: #2c2c2e;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #3a3a3c;
-        }
-        #energy-bar {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, var(--gold), #f39c12);
-            transition: width 0.2s ease, background 0.3s ease;
-        }
-        #energy-label { margin-top: 8px; font-size: 0.9rem; color: #aaa; font-weight: bold; }
+        document.getElementById('coin-wrapper').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (energy >= tapPower) {
+                score += tapPower;
+                energy -= tapPower;
+                tg.HapticFeedback.impactOccurred('light');
+                createParticle(e.touches[0].clientX, e.touches[0].clientY);
+                updateUI();
+            }
+        });
 
-        .btn-group { display: flex; gap: 10px; justify-content: center; }
-        .action-btn {
-            flex: 1;
-            max-width: 160px;
-            padding: 14px;
-            border-radius: 16px;
-            border: none;
-            font
+        function createParticle(x, y) {
+            const p = document.createElement('div');
+            p.className = 'particle'; p.innerText = `+${tapPower}`;
+            p.style.left = x + 'px'; p.style.top = y + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 600);
+        }
+
+        function saveData() {
+            const data = JSON.stringify({score, maxEnergy, tapPower});
+            tg.sendData(data); // Sends to bot and closes app
+        }
+
+        setInterval(() => { if (energy < maxEnergy) { energy = Math.min(energy + 2, maxEnergy); updateUI(); } }, 1000);
+        updateUI();
+    </script>
+</body>
+</html>
