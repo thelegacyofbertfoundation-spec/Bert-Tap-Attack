@@ -6,21 +6,23 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        :root { --accent: #d35400; }
         body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
-        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; visibility: hidden; }
+        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; }
-        #face { width: 280px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); visibility: hidden; }
+        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
         #face:active { transform: scale(0.94); }
-        .btn-group { display: flex; gap: 10px; margin-top: 30px; visibility: hidden; }
-        .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f7dc6f; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
+        .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        #debug-log { position: fixed; bottom: 10px; font-size: 0.7rem; color: #a04000; opacity: 0.5; }
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f7dc6f; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
     <div id="loader">
-        <h2>Waking up Bert...</h2>
-        <div id="load-status">Connecting to Cloud...</div>
+        <h2>Loading Bert...</h2>
+        <p id="load-msg">Contacting CloudStorage...</p>
     </div>
 
     <div id="score-container">
@@ -28,12 +30,16 @@
         <span id="score">0</span>
     </div>
     
-    <img id="face" src="face.png" alt="Bert">
+    <div id="face-wrapper">
+        <img id="face" src="face.png">
+    </div>
 
-    <div class="btn-group" id="ui-buttons">
-        <button class="btn" onclick="saveAndRank()">💾 Sync & Rank</button>
+    <div class="btn-group">
+        <button class="btn" onclick="syncLeaderboard()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
     </div>
+
+    <div id="debug-log">System Initializing...</div>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -41,33 +47,43 @@
 
         let score = 0;
         let tapPower = 1;
-
-        // FORCE START AT ZERO
-        function initGame() {
-            document.getElementById('load-status').innerText = "Fetching saved taps...";
-            
-            tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-                if (!err) {
-                    // Only update if the cloud actually has data
-                    if (values.score !== undefined && values.score !== null) {
-                        score = Number(values.score);
-                    }
-                    if (values.tapPower !== undefined && values.tapPower !== null) {
-                        tapPower = Number(values.tapPower);
-                    }
-                }
-                
-                // Hide loader and show game
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('score-container').style.visibility = 'visible';
-                document.getElementById('face').style.visibility = 'visible';
-                document.getElementById('ui-buttons').style.visibility = 'visible';
-                updateUI();
-            });
-        }
+        const debug = document.getElementById('debug-log');
 
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
+        }
+
+        // --- THE "GHOST KILLER" LOADING LOGIC ---
+        function loadGame() {
+            debug.innerText = "Requesting Cloud Data...";
+            
+            tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+                if (err) {
+                    debug.innerText = "Cloud Error: " + err;
+                } else {
+                    // Force zero if values are missing or malformed
+                    const cloudScore = values.score;
+                    const cloudPower = values.tapPower;
+
+                    if (cloudScore && !isNaN(cloudScore)) {
+                        score = Number(cloudScore);
+                        debug.innerText = "Loaded Score: " + score;
+                    } else {
+                        score = 0;
+                        debug.innerText = "New Player Detected. Score set to 0.";
+                    }
+
+                    if (cloudPower && !isNaN(cloudPower)) {
+                        tapPower = Number(cloudPower);
+                    } else {
+                        tapPower = 1;
+                    }
+                }
+                
+                // Final UI Update and removal of loader
+                updateUI();
+                document.getElementById('loader').style.display = 'none';
+            });
         }
 
         document.getElementById('face').onclick = () => {
@@ -76,28 +92,30 @@
             updateUI();
         };
 
-        function saveAndRank() {
-            // Values MUST be strings for CloudStorage
+        function syncLeaderboard() {
+            debug.innerText = "Syncing to Cloud & Leaderboard...";
+            
+            // 1. Save to Telegram Cloud
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    // Send score to Python for the Leaderboard
+                    // 2. Send to Bot for Leaderboard
                     tg.sendData(JSON.stringify({ score: score }));
                 } else {
-                    tg.showAlert("Sync failed. Check your internet!");
+                    tg.showAlert("Sync failed. Check connection.");
                 }
             });
         }
 
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Can you beat my score in Bert Tap Attack?`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
         }
 
-        // Start the sequence
-        initGame();
+        // Start Loading
+        loadGame();
     </script>
 </body>
 </html>
