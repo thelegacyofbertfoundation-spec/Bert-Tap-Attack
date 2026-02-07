@@ -4,22 +4,22 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # --- CONFIGURATION ---
-# Replace with your actual GitHub Pages URL (Must end in /)
-GITHUB_URL = "https://github.com/thelegacyofbertfoundation-spec/Bert-Tap-Attack/" 
+# The official Bert-Tap-Attack GitHub Pages URL
+GITHUB_URL = "https://thelegacyofbertfoundation-spec.github.io/Bert-Tap-Attack/" 
 TOKEN = os.getenv('BOT_TOKEN')
 
-# Setup logging
+# Setup logging to catch errors in Render logs
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the launcher button to the user."""
+    """Sends the launcher button with the updated GitHub link."""
     user = update.effective_user
     
-    # Launcher button for the Mini App
+    # Launcher button for the Bert-Tap-Attack Mini App
     keyboard = [[
         InlineKeyboardButton(
-            text="🎮 Play Bert Tap Attack", 
+            text="🎮 Launch Bert Tap Attack", 
             web_app=WebAppInfo(url=GITHUB_URL)
         )
     ]]
@@ -43,7 +43,7 @@ def main():
     # Add command handlers
     app.add_handler(CommandHandler("start", start))
 
-    print("Bot is starting up... Ready for Bert Tap Attack.")
+    print("Bert Tap Bot is starting up... Ready for Bert Tap Attack.")
     app.run_polling()
 
 if __name__ == '__main__':
