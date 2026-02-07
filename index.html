@@ -6,15 +6,14 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --bg: #fcf3cf; --accent: #d35400; }
+        :root { --accent: #d35400; --bg: #fcf3cf; }
         body { 
             background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
-            color: #5d4037; font-family: 'Segoe UI', sans-serif; 
+            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
             text-align: center; margin: 0; height: 100vh; display: flex; 
             flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
         }
         
-        /* Fixed Coin Size */
         #score-container { font-size: 3rem; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
 
@@ -22,24 +21,12 @@
         #face { width: 280px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
         #face-wrapper:active { transform: scale(0.94); }
 
-        /* Energy Bar */
-        #energy-container { width: 260px; height: 18px; background: #edbb99; border-radius: 10px; overflow: hidden; margin-top: 20px; border: 2px solid var(--accent); }
-        #energy-bar { width: 100%; height: 100%; background: var(--accent); transition: width 0.2s; }
+        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
+        .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
 
-        /* Shop & Invite UI */
-        #menu-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .btn { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
-        
-        #shop-panel { 
-            position: fixed; bottom: -100%; left: 0; width: 100%; height: 50%; 
-            background: white; border-radius: 25px 25px 0 0; transition: 0.3s; padding: 20px; 
-            box-sizing: border-box; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); 
-        }
-        #shop-panel.open { bottom: 0; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-
-        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 1.8rem; pointer-events: none; animation: float 0.7s forwards; }
-        @keyframes float { 0% { opacity: 1; } 100% { opacity: 0; transform: translateY(-100px); } }
+        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
+        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
     </style>
 </head>
 <body>
@@ -50,88 +37,70 @@
     </div>
     
     <div id="face-wrapper">
-        <img id="face" src="face.png" alt="Tap Target">
+        <img id="face" src="face.png" alt="Bert">
     </div>
 
-    <div id="energy-container"><div id="energy-bar"></div></div>
-    <div style="font-weight: bold; margin-top: 5px; font-size: 0.9rem;">⚡ <span id="energy-val">1000</span> / <span id="energy-max">1000</span></div>
-
-    <div id="menu-buttons">
-        <button class="btn" onclick="toggleShop()">🛒 Shop</button>
+    <div class="btn-group">
         <button class="btn" onclick="inviteFriend()">📢 Invite</button>
-        <button class="btn" onclick="saveData()">💾 Sync</button>
-    </div>
-
-    <div id="shop-panel">
-        <h3>Upgrades</h3>
-        <div class="shop-item">
-            <div><b>Tap Power</b><br><small id="tap-cost">Cost: 100</small></div>
-            <button class="btn" onclick="buyUpgrade('tap')">Buy</button>
-        </div>
-        <button class="btn" style="background:#888; box-shadow:none;" onclick="toggleShop()">Close</button>
+        <button class="btn" onclick="saveToCloud()">💾 Sync Progress</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        const params = new URLSearchParams(window.location.search);
+        tg.expand();
 
-        // Safety loading with fallbacks
-        let score = parseInt(params.get('score')) || 0;
-        let maxEnergy = parseInt(params.get('max_energy')) || 1000;
-        let tapPower = parseInt(params.get('tap_power')) || 1;
-        let energy = maxEnergy;
+        let score = 0;
+        let tapPower = 1;
 
-        function updateUI() {
-            document.getElementById('score').innerText = score.toLocaleString();
-            document.getElementById('energy-val').innerText = Math.floor(energy);
-            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
-            document.getElementById('tap-cost').innerText = `Cost: ${Math.floor(100 * Math.pow(1.5, tapPower-1))}`;
-        }
-
-        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (energy >= tapPower) {
-                score += tapPower; energy -= tapPower;
-                tg.HapticFeedback.impactOccurred('light');
-                createParticle(e.touches[0].clientX, e.touches[0].clientY);
+        // 1. LOAD FROM CLOUD ON STARTUP
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
                 updateUI();
             }
         });
 
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+        }
+
+        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            score += tapPower;
+            tg.HapticFeedback.impactOccurred('light');
+            createParticle(e.touches[0].clientX, e.touches[0].clientY);
+            updateUI();
+        });
+
         function createParticle(x, y) {
             const p = document.createElement('div');
-            p.className = 'particle'; p.innerText = `+${tapPower}`;
+            p.className = 'particle'; p.innerText = '❤️';
             p.style.left = x + 'px'; p.style.top = y + 'px';
             document.body.appendChild(p);
             setTimeout(() => p.remove(), 700);
         }
 
-        function toggleShop() { document.getElementById('shop-panel').classList.toggle('open'); }
-
-        function buyUpgrade(type) {
-            let cost = Math.floor(100 * Math.pow(1.5, tapPower-1));
-            if (score >= cost) {
-                score -= cost; tapPower++;
-                tg.HapticFeedback.notificationOccurred('success');
-                updateUI();
-            }
+        // 2. SAVE TO CLOUD (KEEP GAME OPEN)
+        function saveToCloud() {
+            tg.CloudStorage.setItems({
+                'score': score.toString(),
+                'tapPower': tapPower.toString()
+            }, (err, success) => {
+                if (success) {
+                    tg.showPopup({ message: "Progress synced to Cloud! ✨" });
+                }
+            });
         }
 
+        // 3. REFERRAL (KEEP GAME OPEN)
         function inviteFriend() {
-            const botUser = "BertTapBot"; // Change this if your bot name is different
-            const link = `https://t.me/${botUser}?start=ref`;
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=Join me in Bert Tap Attack!`);
+            const botUrl = "https://t.me/BertTapBot"; 
+            const text = "I'm poking Bert! Join me and earn coins! 💰";
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=${encodeURIComponent(text)}`);
         }
 
-        function saveData() {
-            tg.sendData(JSON.stringify({score, maxEnergy, tapPower}));
-        }
-
-        // Regen energy
-        setInterval(() => { if (energy < maxEnergy) { energy = Math.min(energy + 2, maxEnergy); updateUI(); } }, 1000);
-        
         updateUI();
-        tg.expand();
     </script>
 </body>
 </html>
