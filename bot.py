@@ -5,63 +5,64 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# 1. Setup Logging & Token
-logging.basicConfig(level=logging.INFO)
+# Replace with your actual GitHub Pages URL
+GAME_URL = "https://your-username.github.io/your-repo-name/" 
 TOKEN = os.getenv('BOT_TOKEN')
-GAME_URL = "https://your-username.github.io/your-repo/" # Update this!
 
-# 2. Database Setup
+logging.basicConfig(level=logging.INFO)
+
+# --- Database Logic ---
 def init_db():
-    conn = sqlite3.connect('game_data.db')
+    conn = sqlite3.connect('players.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (user_id INTEGER PRIMARY KEY, score INTEGER, max_energy INTEGER, tap_power INTEGER)''')
+                 (user_id INTEGER PRIMARY KEY, score INTEGER, max_e INTEGER, tap_p INTEGER)''')
     conn.commit()
     conn.close()
 
-def get_user(user_id):
-    conn = sqlite3.connect('game_data.db')
+def get_player(user_id):
+    conn = sqlite3.connect('players.db')
     c = conn.cursor()
-    c.execute("SELECT score, max_energy, tap_power FROM users WHERE user_id=?", (user_id,))
-    data = c.fetchone()
+    c.execute("SELECT score, max_e, tap_p FROM users WHERE user_id=?", (user_id,))
+    res = c.fetchone()
     conn.close()
-    return data if data else (0, 1000, 1)
+    return res if res else (0, 1000, 1)
 
-def save_user(user_id, score, max_energy, tap_power):
-    conn = sqlite3.connect('game_data.db')
+def save_player(user_id, score, max_e, tap_p):
+    conn = sqlite3.connect('players.db')
     c = conn.cursor()
-    c.execute("REPLACE INTO users VALUES (?, ?, ?, ?)", (user_id, score, max_energy, tap_power))
+    c.execute("REPLACE INTO users VALUES (?, ?, ?, ?)", (user_id, score, max_e, tap_p))
     conn.commit()
     conn.close()
 
-# 3. Bot Logic
+# --- Bot Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    score, max_e, tap_p = get_user(user_id)
+    score, max_e, tap_p = get_player(user_id)
     
-    # We pass the saved data into the URL so the game can load it
-    personalized_url = f"{GAME_URL}?score={score}&max_energy={max_e}&tap_power={tap_p}"
+    # Passing saved data into the Web App URL
+    full_url = f"{GAME_URL}?score={score}&max_energy={max_e}&tap_power={tap_p}"
     
-    keyboard = [[InlineKeyboardButton("🎮 Play Now", web_app=WebAppInfo(url=personalized_url))]]
+    keyboard = [[InlineKeyboardButton("🐻 Play Bear Tapper", web_app=WebAppInfo(url=full_url))]]
     await update.message.reply_text(
-        f"Welcome back! Your current balance: 💰 {score}\nReady to tap?",
+        f"Welcome back! Your balance: 💰 {score}\nTap the button to start poking!",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # This triggers when the user clicks "Save & Exit" in the game
-    data = json.loads(update.effective_message.web_app_data.data)
+async def handle_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Triggers when user clicks 'Sync & Exit'
+    raw_data = update.effective_message.web_app_data.data
+    data = json.loads(raw_data)
     user_id = update.effective_user.id
     
-    save_user(user_id, data['score'], data['maxEnergy'], data['tapPower'])
-    
-    await update.message.reply_text(f"✅ Progress synced! Total: 💰 {data['score']}")
+    save_player(user_id, data['score'], data['maxEnergy'], data['tapPower'])
+    await update.message.reply_text(f"✅ Progress saved! Total: {data['score']} 💰")
 
-# 4. Main Run
+# --- Main ---
 if __name__ == '__main__':
     init_db()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    print("Bot is live...")
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_save))
+    print("Bot is running...")
     app.run_polling()
