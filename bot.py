@@ -1,100 +1,104 @@
-import os
-import sqlite3
-import json
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-
-# --- 1. CONFIGURATION ---
-# Replace with your actual GitHub Pages URL (Must end in /)
-GITHUB_URL = "https://your-username.github.io/your-repo-name/" 
-# Replace with your real token from BotFather
-TOKEN = os.getenv('BOT_TOKEN')
-
-# Enable logging to catch errors in Render logs
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# --- 2. DATABASE MANAGEMENT ---
-def init_db():
-    """Creates the player table if it doesn't exist."""
-    conn = sqlite3.connect('players.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (user_id INTEGER PRIMARY KEY, score INTEGER, max_e INTEGER, tap_p INTEGER)''')
-    conn.commit()
-    conn.close()
-
-def get_player(user_id):
-    """Retrieves player data or returns defaults if new user."""
-    conn = sqlite3.connect('players.db')
-    c = conn.cursor()
-    c.execute("SELECT score, max_e, tap_p FROM users WHERE user_id=?", (user_id,))
-    res = c.fetchone()
-    conn.close()
-    return res if res else (0, 1000, 1) # (Score, MaxEnergy, TapPower)
-
-def save_player(user_id, score, max_e, tap_p):
-    """Saves or updates player data in the SQLite database."""
-    conn = sqlite3.connect('players.db')
-    c = conn.cursor()
-    c.execute("REPLACE INTO users VALUES (?, ?, ?, ?)", (user_id, score, max_e, tap_p))
-    conn.commit()
-    conn.close()
-
-# --- 3. COMMAND HANDLERS ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the game link with saved data passed as URL parameters."""
-    user = update.effective_user
-    user_id = user.id
-    
-    # Load their saved progress from the DB
-    score, max_e, tap_p = get_player(user_id)
-    
-    # Build the personalized URL
-    # This ensures the game loads their real score immediately
-    full_url = f"{GITHUB_URL}?score={score}&max_energy={max_e}&tap_power={tap_p}"
-    
-    keyboard = [[
-        InlineKeyboardButton(
-            text="🎮 Play Bert Tap Attack", 
-            web_app=WebAppInfo(url=full_url)
-        )
-    ]]
-    
-    await update.message.reply_text(
-        f"Hey {user.first_name}! 👋\nYour current balance: 💰 {score}\n\n"
-        "Tap the button below to launch the game and start earning!",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-async def handle_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Catches the JSON data sent from the game's 'Sync' button."""
-    try:
-        # WebApp sends data as a JSON string
-        raw_data = update.effective_message.web_app_data.data
-        data = json.loads(raw_data)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bert Tap Attack</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --accent: #d35400; --bg: #fcf3cf; }
+        body { 
+            background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
+            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
+            text-align: center; margin: 0; height: 100vh; display: flex; 
+            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
+        }
         
-        user_id = update.effective_user.id
-        
-        # Save to database
-        save_player(user_id, data['score'], data['maxEnergy'], data['tapPower'])
-        
-        await update.message.reply_text(f"✅ Sync Successful! Your balance: {data['score']} 💰")
-    except Exception as e:
-        logger.error(f"Save data failed: {e}")
+        #score-container { font-size: 3rem; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
+        #coin-icon { width: 50px; height: 50px; margin-right: 12px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
 
-# --- 4. MAIN LOOP ---
-if __name__ == '__main__':
-    # Initialize DB on startup
-    init_db()
+        #face-wrapper { cursor: pointer; transition: transform 0.05s; touch-action: manipulation; }
+        #face { width: 280px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        #face-wrapper:active { transform: scale(0.94); }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
+        .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
+
+        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
+        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="score-container">
+        <img src="coin.png" id="coin-icon" alt="Coin">
+        <span id="score">0</span>
+    </div>
     
-    # Build the Telegram Application
-    app = Application.builder().token(TOKEN).build()
-    
-    # Register handlers
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_save))
-    
-    print("Bert Tap Bot is starting up...")
-    app.run_polling()
+    <div id="face-wrapper">
+        <img id="face" src="face.png" alt="Bert">
+    </div>
+
+    <div class="btn-group">
+        <button class="btn" onclick="inviteFriend()">📢 Invite</button>
+        <button class="btn" onclick="saveToCloud(true)">💾 Manual Sync</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let score = 0;
+        let tapPower = 1;
+
+        // LOAD FROM CLOUD ON STARTUP
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
+                updateUI();
+            }
+        });
+
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+        }
+
+        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            score += tapPower;
+            tg.HapticFeedback.impactOccurred('light');
+            createParticle(e.touches[0].clientX, e.touches[0].clientY);
+            updateUI();
+        });
+
+        function createParticle(x, y) {
+            const p = document.createElement('div');
+            p.className = 'particle'; p.innerText = '❤️';
+            p.style.left = x + 'px'; p.style.top = y + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 700);
+        }
+
+        // SAVE TO CLOUD
+        function saveToCloud(showPopup = false) {
+            tg.CloudStorage.setItems({
+                'score': score.toString(),
+                'tapPower': tapPower.toString()
+            }, (err, success) => {
+                if (success && showPopup) {
+                    tg.showPopup({ message: "Progress synced! ✨" });
+                }
+            });
+        }
+
+        // AUTO-SAVE EVERY 30 SECONDS
+        setInterval(() => {
+            saveToCloud(false);
+        }, 30000);
+
+        function inviteFriend() {
+            const botUrl = "https://t.me/BertTapBot"; 
+            const text = "Poking Bert is addictive! Join me and earn coins! 💰";
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent
