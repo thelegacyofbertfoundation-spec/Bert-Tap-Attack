@@ -6,44 +6,33 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --accent: #d35400; --bg: #fcf3cf; }
-        body { 
-            background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
-            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
-            text-align: center; margin: 0; height: 100vh; display: flex; 
-            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
-        }
-        
-        #score-container { font-size: 3rem; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
-        #coin-icon { width: 50px; height: 50px; margin-right: 12px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
-
-        #face-wrapper { cursor: pointer; transition: transform 0.05s; touch-action: manipulation; }
-        #face { width: 280px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-        #face-wrapper:active { transform: scale(0.94); }
-
-        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
-        .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
-        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
-        .btn:disabled { background: #888; box-shadow: none; opacity: 0.6; }
-
-        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
-        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; visibility: hidden; }
+        #coin-icon { width: 50px; height: 50px; margin-right: 12px; }
+        #face { width: 280px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); visibility: hidden; }
+        #face:active { transform: scale(0.94); }
+        .btn-group { display: flex; gap: 10px; margin-top: 30px; visibility: hidden; }
+        .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f7dc6f; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
     </style>
 </head>
 <body>
 
+    <div id="loader">
+        <h2>Waking up Bert...</h2>
+        <div id="load-status">Connecting to Cloud...</div>
+    </div>
+
     <div id="score-container">
-        <img src="coin.png" id="coin-icon" alt="Coin">
+        <img src="coin.png" id="coin-icon">
         <span id="score">0</span>
     </div>
     
-    <div id="face-wrapper">
-        <img id="face" src="face.png" alt="Bert">
-    </div>
+    <img id="face" src="face.png" alt="Bert">
 
-    <div class="btn-group">
-        <button class="btn" onclick="inviteFriend()">📢 Invite</button>
-        <button id="sync-btn" class="btn" onclick="saveToCloud(true)">💾 Sync Progress</button>
+    <div class="btn-group" id="ui-buttons">
+        <button class="btn" onclick="saveAndRank()">💾 Sync & Rank</button>
+        <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
     </div>
 
     <script>
@@ -53,15 +42,26 @@
         let score = 0;
         let tapPower = 1;
 
-        // LOAD FROM CLOUD
-        function loadData() {
+        // FORCE START AT ZERO
+        function initGame() {
+            document.getElementById('load-status').innerText = "Fetching saved taps...";
+            
             tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-                if (err) {
-                    console.error("Cloud load error:", err);
-                    return;
+                if (!err) {
+                    // Only update if the cloud actually has data
+                    if (values.score !== undefined && values.score !== null) {
+                        score = Number(values.score);
+                    }
+                    if (values.tapPower !== undefined && values.tapPower !== null) {
+                        tapPower = Number(values.tapPower);
+                    }
                 }
-                if (values.score) score = parseInt(values.score);
-                if (values.tapPower) tapPower = parseInt(values.tapPower);
+                
+                // Hide loader and show game
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('score-container').style.visibility = 'visible';
+                document.getElementById('face').style.visibility = 'visible';
+                document.getElementById('ui-buttons').style.visibility = 'visible';
                 updateUI();
             });
         }
@@ -70,55 +70,34 @@
             document.getElementById('score').innerText = score.toLocaleString();
         }
 
-        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
-            e.preventDefault();
+        document.getElementById('face').onclick = () => {
             score += tapPower;
             tg.HapticFeedback.impactOccurred('light');
-            createParticle(e.touches[0].clientX, e.touches[0].clientY);
             updateUI();
-        });
+        };
 
-        function createParticle(x, y) {
-            const p = document.createElement('div');
-            p.className = 'particle'; p.innerText = '❤️';
-            p.style.left = x + 'px'; p.style.top = y + 'px';
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 700);
-        }
-
-        // SAVE TO CLOUD WITH SAFETY
-        function saveToCloud(isManual = false) {
-            const syncBtn = document.getElementById('sync-btn');
-            if (isManual) syncBtn.disabled = true;
-
+        function saveAndRank() {
             // Values MUST be strings for CloudStorage
-            const data = {
+            tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
-            };
-
-            tg.CloudStorage.setItems(data, (err, success) => {
-                if (isManual) syncBtn.disabled = false;
-                
+            }, (err, success) => {
                 if (success) {
-                    if (isManual) tg.showPopup({ message: "Progress saved! ✨" });
-                    console.log("Cloud sync successful");
+                    // Send score to Python for the Leaderboard
+                    tg.sendData(JSON.stringify({ score: score }));
                 } else {
-                    console.error("Cloud sync failed:", err);
-                    if (isManual) tg.showAlert("Sync failed. Check your connection.");
+                    tg.showAlert("Sync failed. Check your internet!");
                 }
             });
         }
 
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            const text = "Poking Bert is addictive! Join me and earn coins! 💰";
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=${encodeURIComponent(text)}`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Can you beat my score in Bert Tap Attack?`);
         }
 
-        // Initialize
-        loadData();
-        setInterval(() => saveToCloud(false), 30000); // Auto-save every 30s
+        // Start the sequence
+        initGame();
     </script>
 </body>
 </html>
