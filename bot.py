@@ -1,104 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Bert Tap Attack</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        :root { --accent: #d35400; --bg: #fcf3cf; }
-        body { 
-            background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
-            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
-            text-align: center; margin: 0; height: 100vh; display: flex; 
-            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
-        }
-        
-        #score-container { font-size: 3rem; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
-        #coin-icon { width: 50px; height: 50px; margin-right: 12px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler, ContextTypes
 
-        #face-wrapper { cursor: pointer; transition: transform 0.05s; touch-action: manipulation; }
-        #face { width: 280px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-        #face-wrapper:active { transform: scale(0.94); }
+# --- CONFIGURATION ---
+# Replace with your actual GitHub Pages URL (Must end in /)
+GITHUB_URL = "https://github.com/thelegacyofbertfoundation-spec/Bert-Tap-Attack/" 
+TOKEN = os.getenv('BOT_TOKEN')
 
-        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
-        .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
-        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
+# Setup logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
-        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
-    </style>
-</head>
-<body>
-
-    <div id="score-container">
-        <img src="coin.png" id="coin-icon" alt="Coin">
-        <span id="score">0</span>
-    </div>
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends the launcher button to the user."""
+    user = update.effective_user
     
-    <div id="face-wrapper">
-        <img id="face" src="face.png" alt="Bert">
-    </div>
+    # Launcher button for the Mini App
+    keyboard = [[
+        InlineKeyboardButton(
+            text="🎮 Play Bert Tap Attack", 
+            web_app=WebAppInfo(url=GITHUB_URL)
+        )
+    ]]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"Ready to go, {user.first_name}? 🚀\n"
+        "Your progress is backed up to Telegram Cloud automatically.",
+        reply_markup=reply_markup
+    )
 
-    <div class="btn-group">
-        <button class="btn" onclick="inviteFriend()">📢 Invite</button>
-        <button class="btn" onclick="saveToCloud(true)">💾 Manual Sync</button>
-    </div>
+def main():
+    if not TOKEN:
+        logger.error("No BOT_TOKEN found! Set it in your environment variables.")
+        return
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+    # Initialize the Application
+    app = Application.builder().token(TOKEN).build()
 
-        let score = 0;
-        let tapPower = 1;
+    # Add command handlers
+    app.add_handler(CommandHandler("start", start))
 
-        // LOAD FROM CLOUD ON STARTUP
-        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-            if (!err) {
-                score = parseInt(values.score) || 0;
-                tapPower = parseInt(values.tapPower) || 1;
-                updateUI();
-            }
-        });
+    print("Bot is starting up... Ready for Bert Tap Attack.")
+    app.run_polling()
 
-        function updateUI() {
-            document.getElementById('score').innerText = score.toLocaleString();
-        }
-
-        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            score += tapPower;
-            tg.HapticFeedback.impactOccurred('light');
-            createParticle(e.touches[0].clientX, e.touches[0].clientY);
-            updateUI();
-        });
-
-        function createParticle(x, y) {
-            const p = document.createElement('div');
-            p.className = 'particle'; p.innerText = '❤️';
-            p.style.left = x + 'px'; p.style.top = y + 'px';
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 700);
-        }
-
-        // SAVE TO CLOUD
-        function saveToCloud(showPopup = false) {
-            tg.CloudStorage.setItems({
-                'score': score.toString(),
-                'tapPower': tapPower.toString()
-            }, (err, success) => {
-                if (success && showPopup) {
-                    tg.showPopup({ message: "Progress synced! ✨" });
-                }
-            });
-        }
-
-        // AUTO-SAVE EVERY 30 SECONDS
-        setInterval(() => {
-            saveToCloud(false);
-        }, 30000);
-
-        function inviteFriend() {
-            const botUrl = "https://t.me/BertTapBot"; 
-            const text = "Poking Bert is addictive! Join me and earn coins! 💰";
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent
+if __name__ == '__main__':
+    main()
