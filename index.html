@@ -6,95 +6,40 @@
     <title>Viral Tapper</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --bg: #fdf6e3; --accent: #e67e22; }
+        :root { --bg: #fdf6e3; --accent: #e67e22; --gold: #f1c40f; }
         body { 
             background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
-            color: #5d4037; font-family: sans-serif; text-align: center; 
-            margin: 0; height: 100vh; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; overflow: hidden; 
+            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
+            text-align: center; margin: 0; height: 100vh; display: flex; 
+            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
         }
-        #score-container { font-size: 4rem; font-weight: 900; display: flex; align-items: center; margin-bottom: 20px; }
-        #coin-icon { width: 120px; height: 120px; margin-right: 20px; }
-        #character-wrapper { cursor: pointer; transition: transform 0.05s; width: 260px; height: 260px; margin-bottom: 20px; }
-        #character { width: 100%; border-radius: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
+        
+        #score-container { 
+            font-size: 4rem; font-weight: 900; display: flex; 
+            align-items: center; justify-content: center; margin-bottom: 20px;
+        }
+        #coin-icon { 
+            width: 120px; height: 120px; /* Double size */
+            margin-right: 20px; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2));
+        }
+        
+        #character-wrapper { 
+            position: relative; cursor: pointer; transition: transform 0.05s; 
+            touch-action: manipulation; width: 260px; height: 260px; margin-bottom: 20px;
+        }
+        #character { width: 100%; height: auto; border-radius: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
         #character-wrapper:active { transform: scale(0.92); }
+
         #energy-container { width: 260px; height: 20px; background: #edbb99; border-radius: 10px; overflow: hidden; border: 2px solid #d35400; }
         #energy-bar { width: 100%; height: 100%; background: #e67e22; transition: width 0.2s; }
-        .particle { position: absolute; color: #d35400; font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s forwards; }
-        @keyframes float { 0% { opacity: 1; } 100% { opacity: 0; transform: translateY(-100px); } }
-        .btn { background: #3498db; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-weight: bold; cursor: pointer; margin-top: 25px; box-shadow: 0 4px 0 #2980b9; }
+        
+        .particle { position: absolute; color: #d35400; font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
+        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+        
+        .btn { background: #3498db; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-weight: bold; cursor: pointer; margin-top: 25px; box-shadow: 0 4px 0 #2980b9; font-size: 1.1rem; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #2980b9; }
     </style>
 </head>
 <body>
 
     <div id="score-container">
-        <img src="coin.png" id="coin-icon">
-        <span id="score">0</span>
-    </div>
-    
-    <div id="character-wrapper">
-        <img id="character" src="face.png">
-    </div>
-
-    <div id="energy-container"><div id="energy-bar"></div></div>
-    <div style="font-weight: bold; margin-top: 8px;">⚡ <span id="energy-val">1000</span> / 1000</div>
-
-    <button class="btn" onclick="shareGame()">📢 Invite Friend (+5k)</button>
-
-    <script>
-        const tg = window.Telegram.WebApp;
-        const storage = tg.CloudStorage;
-        tg.expand();
-
-        let score = 0, energy = 1000, maxEnergy = 1000, tapPower = 1, tapCount = 0;
-
-        // 1. Load data from Telegram Cloud on startup
-        storage.getItems(['score', 'tapPower'], (err, values) => {
-            if (!err) {
-                score = parseInt(values.score) || 0;
-                tapPower = parseInt(values.tapPower) || 1;
-                updateUI();
-            }
-        });
-
-        function updateUI() {
-            document.getElementById('score').innerText = score.toLocaleString();
-            document.getElementById('energy-val').innerText = Math.floor(energy);
-            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
-        }
-
-        // 2. Save data to Telegram Cloud
-        function autoSave() {
-            storage.setItem('score', score.toString());
-            storage.setItem('tapPower', tapPower.toString());
-        }
-
-        document.getElementById('character-wrapper').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (energy >= tapPower) {
-                score += tapPower;
-                energy -= tapPower;
-                tapCount++;
-                if (tapCount >= 20) { autoSave(); tapCount = 0; }
-                tg.HapticFeedback.impactOccurred('medium');
-                createParticle(e.touches[0].clientX, e.touches[0].clientY);
-                updateUI();
-            }
-        });
-
-        function createParticle(x, y) {
-            const p = document.createElement('div'); p.className = 'particle'; p.innerText = '❤️';
-            p.style.left = x + 'px'; p.style.top = y + 'px';
-            document.body.appendChild(p); setTimeout(() => p.remove(), 700);
-        }
-
-        function shareGame() {
-            const inviteLink = `https://t.me/YOUR_BOT_USERNAME`; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=Come tap with me!`);
-            score += 5000; autoSave(); updateUI();
-        }
-
-        setInterval(() => { if (energy < maxEnergy) { energy = Math.min(energy + 3, maxEnergy); updateUI(); } }, 1000);
-    </script>
-</body>
-</html>
