@@ -2,7 +2,7 @@ import os
 import sqlite3
 import json
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
@@ -39,36 +39,41 @@ def get_top_10():
 
 # --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends a Reply Keyboard button. REQUIRED for tg.sendData to work."""
     user = update.effective_user
-    keyboard = [[InlineKeyboardButton("🎮 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
+    
+    # We use a KeyboardButton here because InlineButtons don't support sendData()
+    keyboard = [[KeyboardButton(text="🎮 Open Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
     await update.message.reply_text(
-        f"Welcome {user.first_name}! 🥊\n\nTap the button to start poking Bert!",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        f"Hey {user.first_name}! 🥊\n\nUse the button below at the bottom of your screen to play. This button allows you to Sync & Rank!",
+        reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processes 'Sync & Rank' data and displays the Global Leaderboard."""
+    """This function triggers when the game calls tg.sendData()"""
+    logger.info("Data received from WebApp!") # This will show in Render logs
     try:
         raw_data = update.effective_message.web_app_data.data
         data = json.loads(raw_data)
         user = update.effective_user
         
-        # 1. Update Leaderboard
+        # 1. Save to Database
         update_leaderboard(user.id, user.first_name, int(data['score']))
         
-        # 2. Get Top 10
+        # 2. Generate Leaderboard Text
         top_players = get_top_10()
         lb_text = "🏆 **Global Leaderboard** 🏆\n\n"
         for i, (name, score) in enumerate(top_players, 1):
             lb_text += f"{i}. {name}: {score:,} 💰\n"
             
         await update.message.reply_text(lb_text, parse_mode='Markdown')
-        logger.info(f"Leaderboard updated for {user.first_name}")
 
     except Exception as e:
-        logger.error(f"Sync error: {e}")
+        logger.error(f"Sync failed: {e}")
 
-# --- MAIN RUN ---
+# --- MAIN ---
 if __name__ == '__main__':
     init_db()
     if not TOKEN:
@@ -76,9 +81,9 @@ if __name__ == '__main__':
     else:
         app = Application.builder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
-        # Listen specifically for the data sent by tg.sendData()
+        
+        # This is the listener for WebApp data
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
         
-        print("Starting bot. Cleaning old sessions...")
-        # drop_pending_updates prevents the Conflict error on restart
+        print("Bot is live. Conflict prevention active.")
         app.run_polling(drop_pending_updates=True)
