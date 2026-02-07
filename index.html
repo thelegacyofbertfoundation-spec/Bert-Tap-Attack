@@ -1,117 +1,137 @@
-A "yellow screen" is actually a good sign—it means your CSS (the background gradient) is loading, but the **JavaScript is crashing** before it can draw the rest of the game.
-
-When the JavaScript fails, the code stops running, so your images and text never get placed on the screen. Here is how to fix the common culprits for this specific crash:
-
-### 1. Fix the "Broken Data" Crash
-
-The most common cause for a blank screen is when the code tries to `parseInt` or `json.loads` data that isn't there yet. If the URL doesn't have the `?score=...` parameters, the game doesn't know what to do and freezes.
-
-**Update this section in your `index.html` script:**
-
-```javascript
-// This 'Safe Load' version prevents the game from crashing if data is missing
-const params = new URLSearchParams(window.location.search);
-
-// Use || 0 or || 1000 so there is ALWAYS a fallback number
-let score = parseInt(params.get('score')) || 0;
-let maxEnergy = parseInt(params.get('max_energy')) || 1000;
-let tapPower = parseInt(params.get('tap_power')) || 1;
-let energy = maxEnergy;
-
-// Check if elements exist before trying to update them
-function updateUI() {
-    const scoreEl = document.getElementById('score');
-    const energyValEl = document.getElementById('energy-val');
-    
-    if (scoreEl) scoreEl.innerText = score.toLocaleString();
-    if (energyValEl) energyValEl.innerText = Math.floor(energy);
-    
-    // Update the bar only if it exists
-    const bar = document.getElementById('energy-bar');
-    if (bar) bar.style.width = (energy / maxEnergy * 100) + "%";
-}
-
-```
-
----
-
-### 2. Check for "Hidden" Syntax Errors
-
-If you accidentally deleted a bracket `}` or a semicolon `;` when pasting the code, the whole file will fail to run.
-
-* **The Browser Console:** Open your game URL in **Chrome** on your computer. Right-click anywhere and hit **Inspect** > **Console**.
-* **Look for Red Text:** It will tell you exactly which line has the error (e.g., `Uncaught SyntaxError: Unexpected token`).
-
----
-
-### 3. Verification of `face.png` and `coin.png`
-
-If the script is looking for those files and can't find them, sometimes the loading process hangs.
-
-* Ensure the filenames in your code match the filenames on GitHub **exactly** (no capitals).
-* If you renamed them on GitHub, you **must** update the `src="filename.png"` in your HTML code.
-
----
-
-### 🚀 The "Fresh Start" Code
-
-If you want to clear the deck and fix the yellow screen immediately, copy this **Clean Version** of the `index.html`. It includes "Safety Checks" to ensure it loads even if the bot fails to send data:
-
-```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #score-container { font-size: 3rem; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; }
-        #coin-icon { width: 40px; height: 40px; margin-right: 10px; }
-        #face { width: 280px; cursor: pointer; transition: transform 0.1s; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        #face:active { transform: scale(0.95); }
-        .btn { margin-top: 20px; padding: 10px 20px; background: #d35400; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        :root { --bg: #fcf3cf; --accent: #d35400; }
+        body { 
+            background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
+            color: #5d4037; font-family: 'Segoe UI', sans-serif; 
+            text-align: center; margin: 0; height: 100vh; display: flex; 
+            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
+        }
+        
+        /* Fixed Coin Size */
+        #score-container { font-size: 3rem; font-weight: bold; display: flex; align-items: center; margin-bottom: 10px; }
+        #coin-icon { width: 50px; height: 50px; margin-right: 12px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
+
+        #face-wrapper { cursor: pointer; transition: transform 0.05s; touch-action: manipulation; }
+        #face { width: 280px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        #face-wrapper:active { transform: scale(0.94); }
+
+        /* Energy Bar */
+        #energy-container { width: 260px; height: 18px; background: #edbb99; border-radius: 10px; overflow: hidden; margin-top: 20px; border: 2px solid var(--accent); }
+        #energy-bar { width: 100%; height: 100%; background: var(--accent); transition: width 0.2s; }
+
+        /* Shop & Invite UI */
+        #menu-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
+        
+        #shop-panel { 
+            position: fixed; bottom: -100%; left: 0; width: 100%; height: 50%; 
+            background: white; border-radius: 25px 25px 0 0; transition: 0.3s; padding: 20px; 
+            box-sizing: border-box; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); 
+        }
+        #shop-panel.open { bottom: 0; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+        .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 1.8rem; pointer-events: none; animation: float 0.7s forwards; }
+        @keyframes float { 0% { opacity: 1; } 100% { opacity: 0; transform: translateY(-100px); } }
     </style>
 </head>
 <body>
 
     <div id="score-container">
-        <img src="coin.png" id="coin-icon" onerror="this.style.display='none'">
+        <img src="coin.png" id="coin-icon" alt="Coin">
         <span id="score">0</span>
     </div>
+    
+    <div id="face-wrapper">
+        <img id="face" src="face.png" alt="Tap Target">
+    </div>
 
-    <img src="face.png" id="face" alt="Tap Me!">
+    <div id="energy-container"><div id="energy-bar"></div></div>
+    <div style="font-weight: bold; margin-top: 5px; font-size: 0.9rem;">⚡ <span id="energy-val">1000</span> / <span id="energy-max">1000</span></div>
 
-    <button class="btn" onclick="saveData()">💾 Sync Progress</button>
+    <div id="menu-buttons">
+        <button class="btn" onclick="toggleShop()">🛒 Shop</button>
+        <button class="btn" onclick="inviteFriend()">📢 Invite</button>
+        <button class="btn" onclick="saveData()">💾 Sync</button>
+    </div>
+
+    <div id="shop-panel">
+        <h3>Upgrades</h3>
+        <div class="shop-item">
+            <div><b>Tap Power</b><br><small id="tap-cost">Cost: 100</small></div>
+            <button class="btn" onclick="buyUpgrade('tap')">Buy</button>
+        </div>
+        <button class="btn" style="background:#888; box-shadow:none;" onclick="toggleShop()">Close</button>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         const params = new URLSearchParams(window.location.search);
-        
+
+        // Safety loading with fallbacks
         let score = parseInt(params.get('score')) || 0;
+        let maxEnergy = parseInt(params.get('max_energy')) || 1000;
         let tapPower = parseInt(params.get('tap_power')) || 1;
+        let energy = maxEnergy;
 
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
+            document.getElementById('energy-val').innerText = Math.floor(energy);
+            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
+            document.getElementById('tap-cost').innerText = `Cost: ${Math.floor(100 * Math.pow(1.5, tapPower-1))}`;
         }
 
-        document.getElementById('face').onclick = (e) => {
-            score += tapPower;
-            updateUI();
-            tg.HapticFeedback.impactOccurred('light');
-        };
+        document.getElementById('face-wrapper').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (energy >= tapPower) {
+                score += tapPower; energy -= tapPower;
+                tg.HapticFeedback.impactOccurred('light');
+                createParticle(e.touches[0].clientX, e.touches[0].clientY);
+                updateUI();
+            }
+        });
+
+        function createParticle(x, y) {
+            const p = document.createElement('div');
+            p.className = 'particle'; p.innerText = `+${tapPower}`;
+            p.style.left = x + 'px'; p.style.top = y + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 700);
+        }
+
+        function toggleShop() { document.getElementById('shop-panel').classList.toggle('open'); }
+
+        function buyUpgrade(type) {
+            let cost = Math.floor(100 * Math.pow(1.5, tapPower-1));
+            if (score >= cost) {
+                score -= cost; tapPower++;
+                tg.HapticFeedback.notificationOccurred('success');
+                updateUI();
+            }
+        }
+
+        function inviteFriend() {
+            const botUser = "BertTapBot"; // Change this if your bot name is different
+            const link = `https://t.me/${botUser}?start=ref`;
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=Join me in Bert Tap Attack!`);
+        }
 
         function saveData() {
-            tg.sendData(JSON.stringify({score, maxEnergy: 1000, tapPower}));
+            tg.sendData(JSON.stringify({score, maxEnergy, tapPower}));
         }
 
+        // Regen energy
+        setInterval(() => { if (energy < maxEnergy) { energy = Math.min(energy + 2, maxEnergy); updateUI(); } }, 1000);
+        
         updateUI();
         tg.expand();
     </script>
 </body>
 </html>
-
-```
-
-**Would you like me to show you how to check the Render logs to see if your `bot.py` is sending the correct URL to the game?**
