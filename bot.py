@@ -5,17 +5,15 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# --- 1. CONFIGURATION ---
-# Replace with your actual GitHub Pages URL
+# --- CONFIGURATION ---
 GITHUB_URL = "https://thelegacyofbertfoundation-spec.github.io/Bert-Tap-Attack/" 
 TOKEN = os.getenv('BOT_TOKEN')
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- 2. DATABASE LOGIC ---
+# --- DATABASE LOGIC ---
 def init_db():
-    """Initializes the leaderboard database."""
     conn = sqlite3.connect('bert_data.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS leaderboard 
@@ -24,7 +22,6 @@ def init_db():
     conn.close()
 
 def update_leaderboard(user_id, username, score):
-    """Saves the player's score to the global list."""
     conn = sqlite3.connect('bert_data.db')
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO leaderboard (user_id, username, score) VALUES (?, ?, ?)", 
@@ -33,7 +30,6 @@ def update_leaderboard(user_id, username, score):
     conn.close()
 
 def get_top_10():
-    """Retrieves the top 10 players by score."""
     conn = sqlite3.connect('bert_data.db')
     c = conn.cursor()
     c.execute("SELECT username, score FROM leaderboard ORDER BY score DESC LIMIT 10")
@@ -41,29 +37,26 @@ def get_top_10():
     conn.close()
     return data
 
-# --- 3. HANDLERS ---
+# --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the game launcher."""
     user = update.effective_user
     keyboard = [[InlineKeyboardButton("🎮 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
-    
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\nReady to rank up? Your progress is saved in the Telegram Cloud.",
+        f"Welcome {user.first_name}! 🥊\n\nTap the button to start poking Bert!",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Catches data from the 'Sync & Rank' button."""
+async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Processes 'Sync & Rank' data and displays the Global Leaderboard."""
     try:
-        # Get raw data from Telegram's WebApp signal
         raw_data = update.effective_message.web_app_data.data
         data = json.loads(raw_data)
         user = update.effective_user
         
-        # Save to DB
-        update_leaderboard(user.id, user.first_name, data['score'])
+        # 1. Update Leaderboard
+        update_leaderboard(user.id, user.first_name, int(data['score']))
         
-        # Build the Leaderboard text
+        # 2. Get Top 10
         top_players = get_top_10()
         lb_text = "🏆 **Global Leaderboard** 🏆\n\n"
         for i, (name, score) in enumerate(top_players, 1):
@@ -73,10 +66,9 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.info(f"Leaderboard updated for {user.first_name}")
 
     except Exception as e:
-        logger.error(f"Sync failed: {e}")
-        await update.message.reply_text("❌ Sync Error. Please try again from the game.")
+        logger.error(f"Sync error: {e}")
 
-# --- 4. EXECUTION ---
+# --- MAIN RUN ---
 if __name__ == '__main__':
     init_db()
     if not TOKEN:
@@ -84,9 +76,9 @@ if __name__ == '__main__':
     else:
         app = Application.builder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
+        # Listen specifically for the data sent by tg.sendData()
+        app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
         
-        # Listen for any WebApp data sent back
-        app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
-        
-        print("Bot is live. Using drop_pending_updates to prevent Conflicts.")
+        print("Starting bot. Cleaning old sessions...")
+        # drop_pending_updates prevents the Conflict error on restart
         app.run_polling(drop_pending_updates=True)
