@@ -1,45 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Viral Tapper</title>
+    <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --bg: #fdf6e3; --accent: #e67e22; --gold: #f1c40f; }
-        body { 
-            background: radial-gradient(circle, #fcf3cf 0%, #f7dc6f 100%); 
-            color: #5d4037; font-family: 'Segoe UI', Tahoma, sans-serif; 
-            text-align: center; margin: 0; height: 100vh; display: flex; 
-            flex-direction: column; justify-content: center; align-items: center; overflow: hidden; 
-        }
-        
-        #score-container { 
-            font-size: 4rem; font-weight: 900; display: flex; 
-            align-items: center; justify-content: center; margin-bottom: 20px;
-        }
-        #coin-icon { 
-            width: 120px; height: 120px; /* Double size */
-            margin-right: 20px; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2));
-        }
-        
-        #character-wrapper { 
-            position: relative; cursor: pointer; transition: transform 0.05s; 
-            touch-action: manipulation; width: 260px; height: 260px; margin-bottom: 20px;
-        }
-        #character { width: 100%; height: auto; border-radius: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
-        #character-wrapper:active { transform: scale(0.92); }
-
-        #energy-container { width: 260px; height: 20px; background: #edbb99; border-radius: 10px; overflow: hidden; border: 2px solid #d35400; }
-        #energy-bar { width: 100%; height: 100%; background: #e67e22; transition: width 0.2s; }
-        
-        .particle { position: absolute; color: #d35400; font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
-        @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
-        
-        .btn { background: #3498db; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-weight: bold; cursor: pointer; margin-top: 25px; box-shadow: 0 4px 0 #2980b9; font-size: 1.1rem; }
-        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #2980b9; }
+        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #score-container { font-size: 3rem; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; }
+        #coin-icon { width: 40px; height: 40px; margin-right: 10px; }
+        #face { width: 280px; cursor: pointer; transition: transform 0.1s; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        #face:active { transform: scale(0.95); }
+        .btn { margin-top: 20px; padding: 10px 20px; background: #d35400; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="score-container">
+        <img src="coin.png" id="coin-icon" onerror="this.style.display='none'">
+        <span id="score">0</span>
+    </div>
+
+    <img src="face.png" id="face" alt="Tap Me!">
+
+    <button class="btn" onclick="saveData()">💾 Sync Progress</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const params = new URLSearchParams(window.location.search);
+        
+        let score = parseInt(params.get('score')) || 0;
+        let tapPower = parseInt(params.get('tap_power')) || 1;
+
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+        }
+
+        document.getElementById('face').onclick = (e) => {
+            score += tapPower;
+            updateUI();
+            tg.HapticFeedback.impactOccurred('light');
+        };
+
+        function saveData() {
+            tg.sendData(JSON.stringify({score, maxEnergy: 1000, tapPower}));
+        }
+
+        updateUI();
+        tg.expand();
+    </script>
+</body>
+</html>
