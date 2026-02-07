@@ -2,7 +2,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Replace with the token you got from @BotFather
-TOKEN = 'YOUR_BOT_TOKEN_HERE'
+import os
+TOKEN = os.getenv('BOT_TOKEN')
 # Replace with your GitHub Pages URL
 GAME_URL = 'https://your-username.github.io/viral-tap-game/'
 
@@ -20,7 +21,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 text="📢 Join Channel", 
-                url="https://t.me/your_channel" # Optional: Link to your news channel
+                url="https://t.me/bertcoincto" # Optional: Link to your news channel
             )
         ]
     ]
