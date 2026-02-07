@@ -1,51 +1,67 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-# Replace with the token you got from @BotFather
 import os
+import sqlite3
+import json
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+# 1. Setup Logging & Token
+logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv('BOT_TOKEN')
-# Replace with your GitHub Pages URL
-GAME_URL = 'https://your-username.github.io/viral-tap-game/'
+GAME_URL = "https://your-username.github.io/your-repo/" # Update this!
 
+# 2. Database Setup
+def init_db():
+    conn = sqlite3.connect('game_data.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (user_id INTEGER PRIMARY KEY, score INTEGER, max_energy INTEGER, tap_power INTEGER)''')
+    conn.commit()
+    conn.close()
+
+def get_user(user_id):
+    conn = sqlite3.connect('game_data.db')
+    c = conn.cursor()
+    c.execute("SELECT score, max_energy, tap_power FROM users WHERE user_id=?", (user_id,))
+    data = c.fetchone()
+    conn.close()
+    return data if data else (0, 1000, 1)
+
+def save_user(user_id, score, max_energy, tap_power):
+    conn = sqlite3.connect('game_data.db')
+    c = conn.cursor()
+    c.execute("REPLACE INTO users VALUES (?, ?, ?, ?)", (user_id, score, max_energy, tap_power))
+    conn.commit()
+    conn.close()
+
+# 3. Bot Logic
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a message with a button that opens the Web App."""
+    user_id = update.effective_user.id
+    score, max_e, tap_p = get_user(user_id)
     
-    # This creates the button that launches your game
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                text="🎮 Play Turbo Tapper!", 
-                web_app=WebAppInfo(url=GAME_URL)
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="📢 Join Channel", 
-                url="https://t.me/bertcoincto" # Optional: Link to your news channel
-            )
-        ]
-    ]
+    # We pass the saved data into the URL so the game can load it
+    personalized_url = f"{GAME_URL}?score={score}&max_energy={max_e}&tap_power={tap_p}"
     
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
+    keyboard = [[InlineKeyboardButton("🎮 Play Now", web_app=WebAppInfo(url=personalized_url))]]
     await update.message.reply_text(
-        "🚀 **Welcome to Turbo Tapper!**\n\n"
-        "Tap the coin, upgrade your power, and climb the leaderboard. "
-        "Can you reach Level 100?",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
+        f"Welcome back! Your current balance: 💰 {score}\nReady to tap?",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-def main():
-    # Build the bot
-    application = Application.builder().token(TOKEN).build()
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # This triggers when the user clicks "Save & Exit" in the game
+    data = json.loads(update.effective_message.web_app_data.data)
+    user_id = update.effective_user.id
+    
+    save_user(user_id, data['score'], data['maxEnergy'], data['tapPower'])
+    
+    await update.message.reply_text(f"✅ Progress synced! Total: 💰 {data['score']}")
 
-    # Handle the /start command
-    application.add_handler(CommandHandler("start", start))
-
-    # Run the bot until you stop it
-    print("Bot is running... Press Ctrl+C to stop.")
-    application.run_polling()
-
+# 4. Main Run
 if __name__ == '__main__':
-    main()
+    init_db()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
+    print("Bot is live...")
+    app.run_polling()
