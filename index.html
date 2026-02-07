@@ -24,6 +24,7 @@
         .btn-group { display: flex; gap: 10px; margin-top: 30px; }
         .btn { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; }
         .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04000; }
+        .btn:disabled { background: #888; box-shadow: none; opacity: 0.6; }
 
         .particle { position: absolute; color: var(--accent); font-weight: bold; font-size: 2rem; pointer-events: none; animation: float 0.7s ease-out forwards; }
         @keyframes float { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
@@ -42,7 +43,7 @@
 
     <div class="btn-group">
         <button class="btn" onclick="inviteFriend()">📢 Invite</button>
-        <button class="btn" onclick="saveToCloud()">💾 Sync Progress</button>
+        <button id="sync-btn" class="btn" onclick="saveToCloud(true)">💾 Sync Progress</button>
     </div>
 
     <script>
@@ -52,14 +53,18 @@
         let score = 0;
         let tapPower = 1;
 
-        // 1. LOAD FROM CLOUD ON STARTUP
-        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-            if (!err) {
-                score = parseInt(values.score) || 0;
-                tapPower = parseInt(values.tapPower) || 1;
+        // LOAD FROM CLOUD
+        function loadData() {
+            tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+                if (err) {
+                    console.error("Cloud load error:", err);
+                    return;
+                }
+                if (values.score) score = parseInt(values.score);
+                if (values.tapPower) tapPower = parseInt(values.tapPower);
                 updateUI();
-            }
-        });
+            });
+        }
 
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
@@ -81,26 +86,39 @@
             setTimeout(() => p.remove(), 700);
         }
 
-        // 2. SAVE TO CLOUD (KEEP GAME OPEN)
-        function saveToCloud() {
-            tg.CloudStorage.setItems({
-                'score': score.toString(),
-                'tapPower': tapPower.toString()
-            }, (err, success) => {
+        // SAVE TO CLOUD WITH SAFETY
+        function saveToCloud(isManual = false) {
+            const syncBtn = document.getElementById('sync-btn');
+            if (isManual) syncBtn.disabled = true;
+
+            // Values MUST be strings for CloudStorage
+            const data = {
+                'score': String(score),
+                'tapPower': String(tapPower)
+            };
+
+            tg.CloudStorage.setItems(data, (err, success) => {
+                if (isManual) syncBtn.disabled = false;
+                
                 if (success) {
-                    tg.showPopup({ message: "Progress synced to Cloud! ✨" });
+                    if (isManual) tg.showPopup({ message: "Progress saved! ✨" });
+                    console.log("Cloud sync successful");
+                } else {
+                    console.error("Cloud sync failed:", err);
+                    if (isManual) tg.showAlert("Sync failed. Check your connection.");
                 }
             });
         }
 
-        // 3. REFERRAL (KEEP GAME OPEN)
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            const text = "I'm poking Bert! Join me and earn coins! 💰";
+            const text = "Poking Bert is addictive! Join me and earn coins! 💰";
             tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=${encodeURIComponent(text)}`);
         }
 
-        updateUI();
+        // Initialize
+        loadData();
+        setInterval(() => saveToCloud(false), 30000); // Auto-save every 30s
     </script>
 </body>
 </html>
