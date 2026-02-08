@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V3.2-SYNC-DEBUG</div>
+    <div id="build-tag">BUILD: V3.3-SAFE-SYNC</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -30,7 +30,7 @@
     <img id="face" src="face.png">
 
     <div class="btn-group" id="ui-buttons">
-        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+        <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
         <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Hard Reset to 0</button>
     </div>
@@ -67,25 +67,32 @@
         };
 
         function syncAndRank() {
-            // 1. Save locally to CloudStorage
+            const btn = document.getElementById('sync-btn');
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+
+            // 1. Force save to CloudStorage
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
                     try {
-                        // 2. Send JSON string to the bot
+                        // 2. Send JSON payload
                         const payload = JSON.stringify({ score: Number(score) });
                         tg.sendData(payload);
                         
-                        // Fallback close in case sendData doesn't trigger it automatically
-                        setTimeout(() => { tg.close(); }, 300);
+                        // 3. Close fallback
+                        setTimeout(() => { tg.close(); }, 500);
                     } catch (e) {
-                        // If it doesn't close, this alert will tell us why
-                        tg.showAlert("Sync Error: " + e.message + "\n\nMake sure you launch via the 'Play Bert' button next to the text box!");
+                        tg.showAlert("Browser Blocked Sync. Error: " + e.message);
+                        btn.disabled = false;
+                        btn.innerText = "💾 Sync & Rank";
                     }
                 } else {
-                    tg.showAlert("Cloud save failed: " + err);
+                    tg.showAlert("Cloud save failed. Check connection.");
+                    btn.disabled = false;
+                    btn.innerText = "💾 Sync & Rank";
                 }
             });
         }
