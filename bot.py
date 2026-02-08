@@ -2,7 +2,7 @@ import os
 import sqlite3
 import json
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
@@ -39,20 +39,21 @@ def get_top_10():
 
 # --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends an INLINE keyboard button (required for sendData to work)"""
+    """Sends a REPLY keyboard button (REQUIRED for tg.sendData to work)"""
     user = update.effective_user
     
-    # CRITICAL FIX: Use InlineKeyboard instead of ReplyKeyboard or MenuButton
-    keyboard = [[InlineKeyboardButton(
+    # We use KeyboardButton here. This is the big button at the bottom of the chat.
+    # Launching from THIS button enables the Sync & Rank feature.
+    keyboard = [[KeyboardButton(
         text="🎮 Play Bert Tap Attack",
         web_app=WebAppInfo(url=GITHUB_URL)
     )]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
         f"Hey {user.first_name}! 🥊\n\n"
-        f"Tap the button below to launch the game.\n"
-        f"Use 'Sync & Rank' inside the game to save your score!",
+        f"Use the large button below to launch the game.\n"
+        f"This button enables the 'Sync & Rank' save feature!",
         reply_markup=reply_markup
     )
 
@@ -65,7 +66,7 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data = json.loads(raw_data)
             user = update.effective_user
             
-            logger.info(f"User {user.first_name} (ID: {user.id}) synced score: {data['score']}")
+            logger.info(f"User {user.first_name} synced score: {data['score']}")
             
             update_leaderboard(user.id, user.first_name, int(data['score']))
             
@@ -75,11 +76,9 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lb_text += f"{i}. {name}: {s:,} 💰\n"
             
             await update.message.reply_text(lb_text, parse_mode='Markdown')
-            logger.info("Leaderboard sent successfully")
             
     except Exception as e:
         logger.error(f"Sync failed: {e}")
-        await update.message.reply_text("❌ Sync failed. Please try again!")
 
 # --- EXECUTION ---
 if __name__ == '__main__':
