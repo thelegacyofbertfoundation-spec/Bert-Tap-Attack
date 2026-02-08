@@ -34,7 +34,7 @@ def get_leaderboard_text():
         players = c.fetchall()
     
     if not players:
-        return "🏆 **Global Leaderboard** 🏆\n\nNo scores yet! Sync to be first."
+        return "🏆 **Global Leaderboard** 🏆\n\nNo scores yet! Be the first to Sync."
     
     text = "🏆 **Global Leaderboard** 🏆\n\n"
     for i, (name, s) in enumerate(players, 1):
@@ -43,20 +43,20 @@ def get_leaderboard_text():
 
 # --- 3. BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sets the Menu Button (Critical for Sync) and sends the Keyboard."""
+    """Sets the Menu Button (Paperclip) and Keyboard."""
     user = update.effective_user
     
-    # This sets the button next to the paperclip icon
+    # Refresh the Menu Button next to the text bar
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
     )
     
-    keyboard = [[KeyboardButton(text="🎮 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
+    keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"✅ **Build V3.1 Live**\n\nLaunch via the 'Play Bert' button next to your text box. This ensures the Sync button works!",
+        f"✅ **Build V3.2 Online**\n\nLaunch via the 'Play Bert' button next to your text box for best results.",
         reply_markup=reply_markup
     )
 
@@ -64,23 +64,20 @@ async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_leaderboard_text(), parse_mode='Markdown')
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Triggers automatically when the game closes."""
-    logger.info(">>> SYNC ATTEMPT DETECTED <<<")
+    """Listens specifically for the tg.sendData() signal."""
+    logger.info("************************************")
+    logger.info(">>> SYNC SIGNAL DETECTED BY BOT <<<")
+    logger.info("************************************")
     try:
-        # Check if message contains web_app_data
         if update.effective_message and update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
-            logger.info(f"DATA: {raw_data}")
-            
             data = json.loads(raw_data)
             user = update.effective_user
             
             update_leaderboard(user.id, user.first_name, data['score'])
             await update.message.reply_text(f"✅ Sync Success!\n\n{get_leaderboard_text()}", parse_mode='Markdown')
-        else:
-            logger.warning("Bot heard something, but it wasn't game data.")
     except Exception as e:
-        logger.error(f"Sync error: {e}")
+        logger.error(f"Sync failed: {e}")
 
 # --- 4. MAIN ---
 if __name__ == '__main__':
