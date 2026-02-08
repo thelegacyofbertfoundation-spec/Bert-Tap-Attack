@@ -39,26 +39,26 @@ def get_top_10():
 
 # --- 3. BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sets the Menu Button (paperclip area) and sends the Keyboard Button."""
     user = update.effective_user
     
-    # Set the Menu Button next to the text bar
+    # Force the Menu Button to update every time /start is called
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
     )
     
-    # Large button at the bottom
     keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\n\nI've updated the buttons. Use the 'Play Bert' button next to your text bar or the one below to sync!",
+        f"Hey {user.first_name}! 🥊\n\nI've cleared the session. Launch the game from the button next to your text bar to enable Sync & Rank!",
         reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Triggers when index.html calls tg.sendData()"""
-    logger.info("RECEIVED WEB_APP_DATA SIGNAL")
+    """Processes the 'Sync & Rank' signal from the game."""
+    logger.info(">>> SUCCESS: WEB_APP_DATA RECEIVED <<<")
     try:
         if update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
@@ -74,7 +74,7 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await update.message.reply_text(lb_text, parse_mode='Markdown')
     except Exception as e:
-        logger.error(f"Sync error: {e}")
+        logger.error(f"Sync logic error: {e}")
 
 if __name__ == '__main__':
     init_db()
@@ -84,5 +84,6 @@ if __name__ == '__main__':
         app = Application.builder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
-        print("Bot is running...")
+        
+        # This is vital for Render to prevent Conflict errors
         app.run_polling(drop_pending_updates=True)
