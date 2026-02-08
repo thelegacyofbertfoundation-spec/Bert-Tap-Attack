@@ -6,37 +6,108 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { 
-            background: radial-gradient(circle, #fcf3cf, #f7dc6f); 
-            color: #5d4037; 
-            font-family: sans-serif; 
-            text-align: center; 
-            margin: 0; 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            overflow: hidden; 
+        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+        #build-tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
+        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
+        #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
+        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
+        #face:active { transform: scale(0.94); }
+        .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
+        .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        #loader { font-weight: bold; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div id="build-tag">BUILD: V2.3-YELLOW-FIX</div>
+    <div id="loader">Syncing Cloud...</div>
+
+    <div id="score-container" style="display:none;">
+        <img src="coin.png" id="coin-icon">
+        <span id="score">0</span>
+    </div>
+    
+    <img id="face" src="face.png">
+
+    <div class="btn-group" id="ui-buttons">
+        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+        <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
+        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Hard Reset to 0</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let score = 0;
+        let tapPower = 1;
+        let cloudLoaded = false;
+
+        function showUI() {
+            if (cloudLoaded) return;
+            cloudLoaded = true;
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('score-container').style.display = 'block';
+            document.getElementById('face').style.display = 'block';
+            document.getElementById('ui-buttons').style.display = 'flex';
+            updateUI();
         }
-        #build-tag { 
-            position: fixed; 
-            top: 10px; 
-            font-size: 0.7rem; 
-            color: #d35400; 
-            font-weight: bold; 
+
+        // 3-Second Timeout to bypass the Yellow Screen
+        setTimeout(showUI, 3000);
+
+        // LOAD DATA
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
+            }
+            showUI();
+        });
+
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
         }
-        #score-container { 
-            font-size: 3.5rem; 
-            font-weight: bold; 
-            margin-bottom: 10px; 
+
+        document.getElementById('face').onclick = () => {
+            score += tapPower;
+            tg.HapticFeedback.impactOccurred('light');
+            updateUI();
+        };
+
+        function syncAndRank() {
+            tg.CloudStorage.setItems({
+                'score': String(score),
+                'tapPower': String(tapPower)
+            }, (err, success) => {
+                if (success) {
+                    try {
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        setTimeout(() => { tg.close(); }, 300);
+                    } catch (e) {
+                        tg.showAlert("Sync Error: Use the main bot button!");
+                    }
+                }
+            });
         }
-        #coin-icon { 
-            width: 50px; 
-            height: 50px; 
-            margin-right: 12px; 
-            vertical-align: middle; 
+
+        function hardReset() {
+            if (confirm("Reset everything?")) {
+                score = 0;
+                tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
+                    updateUI();
+                    tg.showAlert("Wiped!");
+                });
+            }
         }
-        #face { 
-            width: 260px; 
-            border-radius: 25px
+
+        function inviteFriend() {
+            const botUrl = "https://t.me/BertTapBot"; 
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
