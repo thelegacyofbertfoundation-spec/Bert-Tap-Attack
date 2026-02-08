@@ -2,14 +2,14 @@ import os
 import sqlite3
 import json
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
 GITHUB_URL = "https://thelegacyofbertfoundation-spec.github.io/Bert-Tap-Attack/" 
 TOKEN = os.getenv('BOT_TOKEN')
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- DATABASE LOGIC ---
@@ -39,41 +39,54 @@ def get_top_10():
 
 # --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sets the Menu Button and sends the Keyboard Button."""
     user = update.effective_user
-    # Using ReplyKeyboardMarkup is the ONLY way to ensure tg.sendData works reliably
-    keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
+    
+    # Set the Menu Button (the one next to the text input)
+    await context.bot.set_chat_menu_button(
+        chat_id=update.effective_chat.id,
+        menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
+    )
+    
+    # Also send the Keyboard Button
+    keyboard = [[KeyboardButton(text="🎮 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\n\nLaunch the game using the button at the bottom of your screen to enable Sync & Rank.",
+        f"Hey {user.first_name}! 🥊\n\nI've added a 'Play' button next to your text bar. "
+        "Launch from there or the button below to enable Sync!",
         reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Triggers when the game calls tg.sendData()"""
+    """Processes data from the Mini App."""
+    logger.info(">>> DATA RECEIVED <<<")
     try:
-        raw_data = update.effective_message.web_app_data.data
-        data = json.loads(raw_data)
-        user = update.effective_user
-        
-        update_leaderboard(user.id, user.first_name, int(data['score']))
-        
-        top_players = get_top_10()
-        lb_text = "🏆 **Global Leaderboard** 🏆\n\n"
-        for i, (name, score) in enumerate(top_players, 1):
-            lb_text += f"{i}. {name}: {score:,} 💰\n"
+        if update.effective_message.web_app_data:
+            raw_data = update.effective_message.web_app_data.data
+            data = json.loads(raw_data)
+            user = update.effective_user
             
-        await update.message.reply_text(lb_text, parse_mode='Markdown')
-        logger.info(f"Leaderboard updated for {user.first_name}")
+            update_leaderboard(user.id, user.first_name, int(data['score']))
+            
+            top_players = get_top_10()
+            lb_text = "🏆 **Global Leaderboard** 🏆\n\n"
+            for i, (name, s) in enumerate(top_players, 1):
+                lb_text += f"{i}. {name}: {s:,} 💰\n"
+            
+            await update.message.reply_text(lb_text, parse_mode='Markdown')
+        
     except Exception as e:
-        logger.error(f"Sync failed: {e}")
+        logger.error(f"Sync error: {e}")
 
+# --- MAIN ---
 if __name__ == '__main__':
     init_db()
     if not TOKEN:
-        logger.error("BOT_TOKEN missing!")
+        logger.error("BOT_TOKEN is missing!")
     else:
         app = Application.builder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
+        print("Bot is live. Conflict prevention (drop_updates) active.")
         app.run_polling(drop_pending_updates=True)
