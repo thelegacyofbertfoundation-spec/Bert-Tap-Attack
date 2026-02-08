@@ -6,20 +6,82 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
-        #build-tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
-        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
-        #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
-        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
-        #face:active { transform: scale(0.94); }
-        .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
-        .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        #loader { font-weight: bold; font-size: 1.2rem; }
+        body { 
+            background: radial-gradient(circle, #fcf3cf, #f7dc6f); 
+            color: #5d4037; 
+            font-family: sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+        }
+        #build-tag { 
+            position: fixed; 
+            top: 10px; 
+            font-size: 0.7rem; 
+            color: #d35400; 
+            font-weight: bold; 
+        }
+        #score-container { 
+            font-size: 3.5rem; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+        }
+        #coin-icon { 
+            width: 50px; 
+            height: 50px; 
+            margin-right: 12px; 
+            vertical-align: middle; 
+        }
+        #face { 
+            width: 260px; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            transition: transform 0.05s; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+            display: none; 
+        }
+        #face:active { 
+            transform: scale(0.94); 
+        }
+        .btn-group { 
+            display: none; 
+            flex-direction: column; 
+            gap: 8px; 
+            margin-top: 25px; 
+        }
+        .btn { 
+            background: #d35400; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            border-radius: 20px; 
+            font-weight: bold; 
+            cursor: pointer; 
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #loader { 
+            font-weight: bold; 
+            font-size: 1.2rem; 
+        }
+        #sync-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #27ae60;
+            min-height: 20px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.1-FIX</div>
+    <div id="build-tag">BUILD: V2.2-FIXED</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container" style="display:none;">
@@ -30,9 +92,10 @@
     <img id="face" src="face.png">
 
     <div class="btn-group" id="ui-buttons">
-        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+        <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
         <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Hard Reset to 0</button>
+        <div id="sync-status"></div>
     </div>
 
     <script>
@@ -67,6 +130,14 @@
         };
 
         function syncAndRank() {
+            const syncBtn = document.getElementById('sync-btn');
+            const syncStatus = document.getElementById('sync-status');
+            
+            // Disable button during sync
+            syncBtn.disabled = true;
+            syncStatus.textContent = 'Syncing...';
+            syncStatus.style.color = '#f39c12';
+            
             // Save to CloudStorage first
             tg.CloudStorage.setItems({
                 'score': String(score),
@@ -74,13 +145,23 @@
             }, (err, success) => {
                 if (success) {
                     try {
-                        // This sends data to bot and MUST close the app
+                        syncStatus.textContent = 'Sending to leaderboard...';
+                        // This sends data to bot and closes the app
                         tg.sendData(JSON.stringify({ "score": score }));
                         // Force close fallback
-                        setTimeout(() => { tg.close(); }, 300);
+                        setTimeout(() => { 
+                            tg.close(); 
+                        }, 300);
                     } catch (e) {
-                        alert("Sync Error: Did you launch via the Bot Button?");
+                        syncStatus.textContent = '❌ Error: Launch game from chat button!';
+                        syncStatus.style.color = '#e74c3c';
+                        syncBtn.disabled = false;
+                        console.error('Sync error:', e);
                     }
+                } else {
+                    syncStatus.textContent = '❌ Cloud save failed!';
+                    syncStatus.style.color = '#e74c3c';
+                    syncBtn.disabled = false;
                 }
             });
         }
@@ -91,6 +172,7 @@
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
                     tg.showAlert("Cloud wiped!");
+                    document.getElementById('sync-status').textContent = '';
                 });
             }
         }
