@@ -8,28 +8,21 @@
     <style>
         body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
         #build-tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
-        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
+        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: none; }
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
         #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
         #face:active { transform: scale(0.94); }
         .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         #loader { font-weight: bold; font-size: 1.2rem; }
-        #error-display { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #e74c3c; color: white; padding: 20px; z-index: 99999; }
     </style>
 </head>
 <body>
 
-    <div id="error-display">
-        <h2>⚠️ JavaScript Crash</h2>
-        <p id="error-msg"></p>
-        <button onclick="location.reload()" style="padding:10px; border-radius:10px; border:none;">Reload Game</button>
-    </div>
+    <div id="build-tag">BUILD: V2.4-SYNC-FIX</div>
+    <div id="loader">Syncing Cloud...</div>
 
-    <div id="build-tag">BUILD: V2.4-ULTRA-FIX</div>
-    <div id="loader">Checking Cloud Data...</div>
-
-    <div id="score-container" style="display:none;">
+    <div id="score-container">
         <img src="coin.png" id="coin-icon">
         <span id="score">0</span>
     </div>
@@ -43,82 +36,68 @@
     </div>
 
     <script>
-        // EMERGENCY ERROR CATCHER
-        window.onerror = function(msg, url, line) {
-            document.getElementById('error-display').style.display = 'block';
-            document.getElementById('error-msg').innerText = "Error: " + msg + "\nLine: " + line;
-            return false;
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let score = 0;
+        let tapPower = 1;
+
+        // LOAD FROM CLOUD
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
+            }
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('score-container').style.display = 'block';
+            document.getElementById('face').style.display = 'block';
+            document.getElementById('ui-buttons').style.display = 'flex';
+            updateUI();
+        });
+
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+        }
+
+        document.getElementById('face').onclick = () => {
+            score += tapPower;
+            tg.HapticFeedback.impactOccurred('light');
+            updateUI();
         };
 
-        const tg = window.Telegram.WebApp;
-        
-        try {
-            tg.ready();
-            tg.expand();
-
-            let score = 0;
-            let tapPower = 1;
-
-            // Load from Cloud with a "Force Start" fallback
-            const loadTimer = setTimeout(() => {
-                showGame();
-            }, 4000);
-
-            tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-                clearTimeout(loadTimer);
-                if (!err) {
-                    score = parseInt(values.score) || 0;
-                    tapPower = parseInt(values.tapPower) || 1;
-                }
-                showGame();
-            });
-
-            function showGame() {
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('score-container').style.display = 'block';
-                document.getElementById('face').style.display = 'block';
-                document.getElementById('ui-buttons').style.display = 'flex';
-                updateUI();
-            }
-
-            function updateUI() {
-                document.getElementById('score').innerText = score.toLocaleString();
-            }
-
-            document.getElementById('face').onclick = () => {
-                score += tapPower;
-                tg.HapticFeedback.impactOccurred('light');
-                updateUI();
-            };
-
-            function syncAndRank() {
-                tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
-                    if (success) {
-                        tg.sendData(JSON.stringify({"score": score}));
-                        setTimeout(() => tg.close(), 300);
-                    }
-                });
-            }
-
-            function hardReset() {
-                if(confirm("Reset to 0?")) {
-                    score = 0;
-                    tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
-                        updateUI();
-                        tg.showAlert("Cloud wiped!");
+        function syncAndRank() {
+            // Corrected to singular setItem for stability
+            tg.CloudStorage.setItem('score', String(score), (err, success) => {
+                if (success) {
+                    tg.CloudStorage.setItem('tapPower', String(tapPower), () => {
+                        try {
+                            tg.sendData(JSON.stringify({ "score": score }));
+                            setTimeout(() => { tg.close(); }, 300);
+                        } catch (e) {
+                            alert("Sync Error: Did you use the Bot Button?");
+                        }
                     });
                 }
-            }
-
-            function inviteFriend() {
-                tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/BertTapBot&text=Join me in Bert Tap Attack!`);
-            }
-
-            updateUI();
-        } catch (e) {
-            document.getElementById('error-display').style.display = 'block';
-            document.getElementById('error-msg').innerText = "Init Error: " + e.message;
+            });
         }
+
+        function hardReset() {
+            if (confirm("Reset everything?")) {
+                score = 0;
+                tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
+                    updateUI();
+                    tg.showAlert("Cloud wiped!");
+                });
+            }
+        }
+
+        function inviteFriend() {
+            const botUrl = "https://t.me/BertTapBot"; 
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
+        }
+
+        updateUI();
     </script>
 </body>
 </html>
