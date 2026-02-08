@@ -18,40 +18,31 @@
     </style>
 </head>
 <body>
-
-    <div style="margin-top: 10px; font-size: 0.7rem; opacity: 0.5;">BUILD: V3.5-FINAL</div>
+    <div style="margin-top: 10px; font-size: 0.7rem; opacity: 0.5;">BUILD: V3.5-LOG-FIX</div>
     <div>
         <img src="coin.png" id="coin-icon">
         <div id="score">0</div>
     </div>
-
     <img id="face" src="face.png">
-
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
         <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
-
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
-
         let score = 0, energy = 100;
-
         tg.CloudStorage.getItems(['score'], (err, values) => {
             if (!err) score = parseInt(values.score) || 0;
             updateUI();
         });
-
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
             document.getElementById('e-val').innerText = Math.floor(energy);
             document.getElementById('energy-bar').style.width = energy + "%";
         }
-
         setInterval(() => { if(energy < 100) { energy += 1; updateUI(); } }, 1000);
-
         document.getElementById('face').onclick = () => {
             if (energy >= 1) {
                 score += 1; energy -= 1;
@@ -59,15 +50,13 @@
                 updateUI();
             }
         };
-
         function syncAndRank() {
-            // Save to CloudStorage then sendData to Bot
             tg.CloudStorage.setItem('score', String(score), (err, success) => {
                 try {
                     tg.sendData(JSON.stringify({ "score": score }));
                     setTimeout(() => { tg.close(); }, 300);
                 } catch (e) {
-                    tg.showAlert("Launch using the CHAT BUTTON, not the menu icon.");
+                    tg.showAlert("Launch using the CHAT BUTTON!");
                 }
             });
         }
