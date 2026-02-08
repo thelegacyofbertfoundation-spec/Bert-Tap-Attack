@@ -6,28 +6,60 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
-        #build-tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
-        #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: none; }
-        #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
-        #face:active { transform: scale(0.94); }
-        .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
-        .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        body { 
+            background: #2c2c2c; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; margin: 0; height: 100vh; 
+            display: flex; flex-direction: column; justify-content: space-between; 
+            align-items: center; overflow: hidden; 
+        }
+        #header { margin-top: 20px; }
+        #coin-icon { width: 120px; height: 120px; display: block; margin: 0 auto 5px; }
+        #score { font-size: 3rem; font-weight: bold; }
+        
+        #face-container { width: 100%; display: flex; justify-content: center; }
+        #face { width: 100vw; max-width: 600px; cursor: pointer; transition: transform 0.05s; }
+        #face:active { transform: scale(0.96); }
+
+        #energy-container { width: 80%; background: #444; height: 20px; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+        #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
+        
+        .ui-footer { width: 100%; padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; cursor: pointer; width: 80%; }
+        .shop-btn { background: #2980b9; }
+        
+        /* Shop Modal */
+        #shop-modal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+        }
     </style>
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V3.2-DEBUG</div>
-
-    <div id="score-container">
-        <span id="score">0</span>
+    <div id="header">
+        <img src="coin.png" id="coin-icon">
+        <div id="score">0</div>
     </div>
-    
-    <img id="face" src="face.png">
 
-    <div class="btn-group" id="ui-buttons">
+    <div id="face-container">
+        <img id="face" src="face.png">
+    </div>
+
+    <div class="ui-footer">
+        <div id="energy-text">Energy: 100/100</div>
+        <div id="energy-container"><div id="energy-bar"></div></div>
+        
+        <button class="btn shop-btn" onclick="openShop()">🛒 Open Shop</button>
         <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
-        <button style="background:none; border:none; color:#a04000; font-size:0.7rem; margin-top:10px;" onclick="hardReset()">Reset 0</button>
+    </div>
+
+    <div id="shop-modal">
+        <h2>Bert's Gym</h2>
+        <p>Current Tap Power: <span id="tap-val">1</span></p>
+        <button class="btn" id="upgrade-btn" onclick="buyUpgrade()">Upgrade Power (Cost: 100)</button>
+        <button class="btn" style="background:#444; margin-top:20px;" onclick="closeShop()">Back to Fight</button>
     </div>
 
     <script>
@@ -36,42 +68,74 @@
         tg.expand();
 
         let score = 0;
+        let tapPower = 1;
+        let energy = 100;
+        const maxEnergy = 100;
 
-        tg.CloudStorage.getItems(['score'], (err, values) => {
-            if (!err) score = parseInt(values.score) || 0;
-            document.getElementById('score-container').style.display = 'block';
-            document.getElementById('face').style.display = 'block';
-            document.getElementById('ui-buttons').style.display = 'flex';
+        // LOAD DATA
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
+            }
             updateUI();
         });
 
-        function updateUI() { document.getElementById('score').innerText = score.toLocaleString(); }
+        function updateUI() {
+            document.getElementById('score').innerText = score.toLocaleString();
+            document.getElementById('tap-val').innerText = tapPower;
+            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
+            document.getElementById('energy-text').innerText = `Energy: ${Math.floor(energy)}/${maxEnergy}`;
+            
+            let cost = tapPower * 100;
+            document.getElementById('upgrade-btn').innerText = `Upgrade Power (Cost: ${cost})`;
+        }
+
+        // Energy Recovery System
+        setInterval(() => {
+            if (energy < maxEnergy) {
+                energy = Math.min(maxEnergy, energy + 0.5);
+                updateUI();
+            }
+        }, 1000);
 
         document.getElementById('face').onclick = () => {
-            score += 1;
-            tg.HapticFeedback.impactOccurred('light');
-            updateUI();
+            if (energy >= 1) {
+                score += tapPower;
+                energy -= 1;
+                tg.HapticFeedback.impactOccurred('medium');
+                updateUI();
+            } else {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
         };
 
+        function openShop() { document.getElementById('shop-modal').style.display = 'flex'; }
+        function closeShop() { document.getElementById('shop-modal').style.display = 'none'; }
+
+        function buyUpgrade() {
+            let cost = tapPower * 100;
+            if (score >= cost) {
+                score -= cost;
+                tapPower += 1;
+                tg.HapticFeedback.notificationOccurred('success');
+                updateUI();
+            } else {
+                tg.showAlert("Not enough coins!");
+            }
+        }
+
         function syncAndRank() {
-            // Simplified: Save Cloud, then Send
-            tg.CloudStorage.setItem('score', String(score), (err, success) => {
-                try {
+            tg.CloudStorage.setItems({
+                'score': String(score),
+                'tapPower': String(tapPower)
+            }, (err, success) => {
+                if (success) {
                     tg.sendData(JSON.stringify({ "score": score }));
                     setTimeout(() => { tg.close(); }, 300);
-                } catch (e) {
-                    alert("CRASH: " + e.message);
                 }
             });
         }
-
-        function hardReset() {
-            if (confirm("Reset?")) {
-                score = 0;
-                tg.CloudStorage.removeItems(['score'], () => { updateUI(); });
-            }
-        }
-        updateUI();
     </script>
 </body>
 </html>
