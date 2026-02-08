@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.9-STABLE</div>
+    <div id="build-tag">BUILD: V3.0-DEBUG-ACTIVE</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -43,7 +43,7 @@
         let score = 0;
         let tapPower = 1;
 
-        // Load data safely
+        // LOAD DATA
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -67,42 +67,40 @@
         };
 
         function syncAndRank() {
-            // First: Save to CloudStorage
-            const saveData = {
+            // 1. Save to CloudStorage first
+            tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
-            };
-
-            tg.CloudStorage.setItems(saveData, (err, success) => {
+            }, (err, success) => {
                 if (success) {
                     try {
-                        // Second: Send data to bot and close
-                        const payload = JSON.stringify({ score: score });
-                        tg.sendData(payload);
-                        // 300ms delay to ensure data leaves before closing
+                        // 2. Send Data to Bot
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        // 3. Force close if it hasn't happened in 300ms
                         setTimeout(() => { tg.close(); }, 300);
                     } catch (e) {
-                        alert("Sync Signal Error: " + e.message);
+                        // This alert will tell us if Telegram is blocking the sync
+                        tg.showAlert("Sync Blocked. Please use the button in the chat!");
                     }
                 } else {
-                    alert("Cloud Save Error: " + err);
+                    tg.showAlert("Cloud save failed. Error: " + err);
                 }
             });
         }
 
         function hardReset() {
-            if (confirm("Reset everything?")) {
+            if (confirm("Reset to 0?")) {
                 score = 0;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
-                    tg.showAlert("Cloud Wiped!");
+                    tg.showAlert("Cloud wiped!");
                 });
             }
         }
 
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join Bert Tap Attack!`);
         }
 
         updateUI();
