@@ -34,7 +34,7 @@ def get_leaderboard_text():
         players = c.fetchall()
     
     if not players:
-        return "🏆 **Global Leaderboard** 🏆\n\nNo scores yet! Be the first to Sync."
+        return "🏆 **Global Leaderboard** 🏆\n\nNo scores recorded yet. Be the first to Sync!"
     
     text = "🏆 **Global Leaderboard** 🏆\n\n"
     for i, (name, s) in enumerate(players, 1):
@@ -43,7 +43,7 @@ def get_leaderboard_text():
 
 # --- 3. BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sets the Menu Button (Paperclip) and Keyboard."""
+    """Sets the Menu Button (Paperclip area) and Keyboard."""
     user = update.effective_user
     
     # Refresh the Menu Button next to the text bar
@@ -56,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"✅ **Build V3.2 Online**\n\nLaunch via the 'Play Bert' button next to your text box for best results.",
+        f"✅ **V3.3 Safe-Mode Active**\n\nLaunch via the 'Play Bert' button next to your text box. This is the only way to ensure Sync & Rank works!",
         reply_markup=reply_markup
     )
 
@@ -65,9 +65,7 @@ async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Listens specifically for the tg.sendData() signal."""
-    logger.info("************************************")
-    logger.info(">>> SYNC SIGNAL DETECTED BY BOT <<<")
-    logger.info("************************************")
+    logger.info(">>> SYNC SIGNAL RECEIVED <<<")
     try:
         if update.effective_message and update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
