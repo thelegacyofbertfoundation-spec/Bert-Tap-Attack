@@ -2,7 +2,7 @@ import os
 import sqlite3
 import json
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
@@ -39,25 +39,26 @@ def get_top_10():
 
 # --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a clean launcher button to bypass the yellow screen."""
+    """Refreshes the buttons and launches the game."""
     user = update.effective_user
     
-    # We use a KeyboardButton for the most stable connection to the WebApp
-    keyboard = [[KeyboardButton(
-        text="🎮 Play Bert Tap Attack",
-        web_app=WebAppInfo(url=GITHUB_URL)
-    )]]
+    # Set the small 'Play' button next to the text bar
+    await context.bot.set_chat_menu_button(
+        chat_id=update.effective_chat.id,
+        menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
+    )
+    
+    # Large button at the bottom
+    keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\n\nIf you see a yellow screen, please wait 5 seconds or restart the bot.\n"
-        "Launch the game below:",
+        f"Hey {user.first_name}! 🥊\n\nIf you still see a yellow screen, please clear your Telegram cache in Settings > Data and Storage.",
         reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processes 'Sync & Rank' data."""
-    logger.info(">>> DATA RECEIVED FROM GAME <<<")
     try:
         if update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
@@ -84,6 +85,5 @@ if __name__ == '__main__':
         app = Application.builder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
-        
-        # Use drop_pending_updates to prevent Conflict errors
+        # drop_pending_updates prevents Conflict errors
         app.run_polling(drop_pending_updates=True)
