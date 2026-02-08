@@ -15,12 +15,19 @@
         .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         #loader { font-weight: bold; font-size: 1.2rem; }
+        #error-display { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #e74c3c; color: white; padding: 20px; z-index: 99999; }
     </style>
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.3-YELLOW-FIX</div>
-    <div id="loader">Syncing Cloud...</div>
+    <div id="error-display">
+        <h2>⚠️ JavaScript Crash</h2>
+        <p id="error-msg"></p>
+        <button onclick="location.reload()" style="padding:10px; border-radius:10px; border:none;">Reload Game</button>
+    </div>
+
+    <div id="build-tag">BUILD: V2.4-ULTRA-FIX</div>
+    <div id="loader">Checking Cloud Data...</div>
 
     <div id="score-container" style="display:none;">
         <img src="coin.png" id="coin-icon">
@@ -36,78 +43,82 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        let score = 0;
-        let tapPower = 1;
-        let cloudLoaded = false;
-
-        function showUI() {
-            if (cloudLoaded) return;
-            cloudLoaded = true;
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('score-container').style.display = 'block';
-            document.getElementById('face').style.display = 'block';
-            document.getElementById('ui-buttons').style.display = 'flex';
-            updateUI();
-        }
-
-        // 3-Second Timeout to bypass the Yellow Screen
-        setTimeout(showUI, 3000);
-
-        // LOAD DATA
-        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-            if (!err) {
-                score = parseInt(values.score) || 0;
-                tapPower = parseInt(values.tapPower) || 1;
-            }
-            showUI();
-        });
-
-        function updateUI() {
-            document.getElementById('score').innerText = score.toLocaleString();
-        }
-
-        document.getElementById('face').onclick = () => {
-            score += tapPower;
-            tg.HapticFeedback.impactOccurred('light');
-            updateUI();
+        // EMERGENCY ERROR CATCHER
+        window.onerror = function(msg, url, line) {
+            document.getElementById('error-display').style.display = 'block';
+            document.getElementById('error-msg').innerText = "Error: " + msg + "\nLine: " + line;
+            return false;
         };
 
-        function syncAndRank() {
-            tg.CloudStorage.setItems({
-                'score': String(score),
-                'tapPower': String(tapPower)
-            }, (err, success) => {
-                if (success) {
-                    try {
-                        tg.sendData(JSON.stringify({ "score": score }));
-                        setTimeout(() => { tg.close(); }, 300);
-                    } catch (e) {
-                        tg.showAlert("Sync Error: Use the main bot button!");
-                    }
-                }
-            });
-        }
+        const tg = window.Telegram.WebApp;
+        
+        try {
+            tg.ready();
+            tg.expand();
 
-        function hardReset() {
-            if (confirm("Reset everything?")) {
-                score = 0;
-                tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
-                    updateUI();
-                    tg.showAlert("Wiped!");
+            let score = 0;
+            let tapPower = 1;
+
+            // Load from Cloud with a "Force Start" fallback
+            const loadTimer = setTimeout(() => {
+                showGame();
+            }, 4000);
+
+            tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+                clearTimeout(loadTimer);
+                if (!err) {
+                    score = parseInt(values.score) || 0;
+                    tapPower = parseInt(values.tapPower) || 1;
+                }
+                showGame();
+            });
+
+            function showGame() {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('score-container').style.display = 'block';
+                document.getElementById('face').style.display = 'block';
+                document.getElementById('ui-buttons').style.display = 'flex';
+                updateUI();
+            }
+
+            function updateUI() {
+                document.getElementById('score').innerText = score.toLocaleString();
+            }
+
+            document.getElementById('face').onclick = () => {
+                score += tapPower;
+                tg.HapticFeedback.impactOccurred('light');
+                updateUI();
+            };
+
+            function syncAndRank() {
+                tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
+                    if (success) {
+                        tg.sendData(JSON.stringify({"score": score}));
+                        setTimeout(() => tg.close(), 300);
+                    }
                 });
             }
-        }
 
-        function inviteFriend() {
-            const botUrl = "https://t.me/BertTapBot"; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
-        }
+            function hardReset() {
+                if(confirm("Reset to 0?")) {
+                    score = 0;
+                    tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
+                        updateUI();
+                        tg.showAlert("Cloud wiped!");
+                    });
+                }
+            }
 
-        updateUI();
+            function inviteFriend() {
+                tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/BertTapBot&text=Join me in Bert Tap Attack!`);
+            }
+
+            updateUI();
+        } catch (e) {
+            document.getElementById('error-display').style.display = 'block';
+            document.getElementById('error-msg').innerText = "Init Error: " + e.message;
+        }
     </script>
 </body>
 </html>
