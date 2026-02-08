@@ -2,7 +2,7 @@ import os
 import sqlite3
 import json
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonWebApp
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- CONFIGURATION ---
@@ -39,32 +39,33 @@ def get_top_10():
 
 # --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Refreshes the Menu Button and sends a Keyboard Button."""
+    """Sends an INLINE keyboard button (required for sendData to work)"""
     user = update.effective_user
     
-    # This places the 'Play' button directly next to the text input bar
-    await context.bot.set_chat_menu_button(
-        chat_id=update.effective_chat.id,
-        menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
-    )
-    
-    # Large button at the bottom
-    keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # CRITICAL FIX: Use InlineKeyboard instead of ReplyKeyboard or MenuButton
+    keyboard = [[InlineKeyboardButton(
+        text="🎮 Play Bert Tap Attack",
+        web_app=WebAppInfo(url=GITHUB_URL)
+    )]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\n\nBuild updated. Please use the button next to your text bar to ensure Sync & Rank works!",
+        f"Hey {user.first_name}! 🥊\n\n"
+        f"Tap the button below to launch the game.\n"
+        f"Use 'Sync & Rank' inside the game to save your score!",
         reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processes 'Sync & Rank' data and displays the Global Leaderboard."""
-    logger.info(">>> SUCCESS: DATA RECEIVED FROM GAME <<<")
+    logger.info(">>> DATA RECEIVED FROM GAME <<<")
     try:
         if update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
             data = json.loads(raw_data)
             user = update.effective_user
+            
+            logger.info(f"User {user.first_name} (ID: {user.id}) synced score: {data['score']}")
             
             update_leaderboard(user.id, user.first_name, int(data['score']))
             
@@ -74,9 +75,11 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lb_text += f"{i}. {name}: {s:,} 💰\n"
             
             await update.message.reply_text(lb_text, parse_mode='Markdown')
+            logger.info("Leaderboard sent successfully")
             
     except Exception as e:
         logger.error(f"Sync failed: {e}")
+        await update.message.reply_text("❌ Sync failed. Please try again!")
 
 # --- EXECUTION ---
 if __name__ == '__main__':
@@ -88,5 +91,5 @@ if __name__ == '__main__':
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
         
-        # Use drop_pending_updates=True to prevent Conflict errors
+        logger.info("Bot starting with polling...")
         app.run_polling(drop_pending_updates=True)
