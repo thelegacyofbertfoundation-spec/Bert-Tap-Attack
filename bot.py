@@ -36,7 +36,8 @@ def get_leaderboard_text():
     players = c.fetchall()
     conn.close()
     if not players:
-        return "🏆 **Global Leaderboard** 🏆\n\nNo scores yet! Sync to be first."
+        return "🏆 **Global Leaderboard** 🏆\n\nNo scores yet! Be the first to Sync & Rank."
+    
     text = "🏆 **Global Leaderboard** 🏆\n\n"
     for i, (name, s) in enumerate(players, 1):
         text += f"{i}. **{name}**: {s:,} 💰\n"
@@ -44,34 +45,52 @@ def get_leaderboard_text():
 
 # --- 3. BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sets up the app launchers now that Mini App is enabled."""
     user = update.effective_user
+    
+    # Refresh the Menu Button next to the text bar
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
     )
+    
+    # Send the large Keyboard Button
     keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("✅ **Bot Connected**\nSync your score to see the leaderboard!", reply_markup=reply_markup)
+    
+    await update.message.reply_text(
+        f"✅ **Mini App Mode Enabled!**\n\nLaunch using the 'Play Bert' button or the one below. "
+        "Your 'Sync & Rank' button will now work!",
+        reply_markup=reply_markup
+    )
 
 async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manual leaderboard check."""
     await update.message.reply_text(get_leaderboard_text(), parse_mode='Markdown')
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processes the WebApp data signal."""
-    logger.info(">>> SIGNAL RECEIVED <<<")
+    """Catches data from the Mini App when the user clicks Sync."""
+    logger.info(">>> SUCCESS: DATA SIGNAL CAUGHT <<<")
     try:
-        if update.effective_message.web_app_data:
-            data = json.loads(update.effective_message.web_app_data.data)
-            user = update.effective_user
-            update_leaderboard(user.id, user.first_name, int(data.get('score', 0)))
-            await update.message.reply_text(f"✅ Sync Successful!\n\n{get_leaderboard_text()}", parse_mode='Markdown')
+        raw_data = update.effective_message.web_app_data.data
+        data = json.loads(raw_data)
+        user = update.effective_user
+        
+        # Save score
+        update_leaderboard(user.id, user.first_name, int(data['score']))
+        
+        # Reply with rankings
+        await update.message.reply_text(get_leaderboard_text(), parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Sync error: {e}")
 
 if __name__ == '__main__':
     init_db()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("leaderboard", leaderboard_cmd))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
-    app.run_polling(drop_pending_updates=True)
+    if not TOKEN:
+        logger.error("BOT_TOKEN is missing!")
+    else:
+        app = Application.builder().token(TOKEN).build()
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("leaderboard", leaderboard_cmd))
+        app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
+        app.run_polling(drop_pending_updates=True)
