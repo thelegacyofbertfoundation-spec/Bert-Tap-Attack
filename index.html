@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V3.1-ZERO-FAIL</div>
+    <div id="build-tag">BUILD: V3.2-SYNC-DEBUG</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -43,7 +43,7 @@
         let score = 0;
         let tapPower = 1;
 
-        // LOAD DATA
+        // Load Cloud Data
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -67,26 +67,31 @@
         };
 
         function syncAndRank() {
-            // Save to CloudStorage first
+            // 1. Save locally to CloudStorage
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
-                try {
-                    // Send to Bot and Force Close
-                    const payload = JSON.stringify({ score: Number(score) });
-                    tg.sendData(payload);
-                    
-                    // Final close fallback
-                    setTimeout(() => { tg.close(); }, 200);
-                } catch (e) {
-                    tg.showAlert("Browser Blocked Sync! Use the 'Play Bert' button next to your text box.");
+                if (success) {
+                    try {
+                        // 2. Send JSON string to the bot
+                        const payload = JSON.stringify({ score: Number(score) });
+                        tg.sendData(payload);
+                        
+                        // Fallback close in case sendData doesn't trigger it automatically
+                        setTimeout(() => { tg.close(); }, 300);
+                    } catch (e) {
+                        // If it doesn't close, this alert will tell us why
+                        tg.showAlert("Sync Error: " + e.message + "\n\nMake sure you launch via the 'Play Bert' button next to the text box!");
+                    }
+                } else {
+                    tg.showAlert("Cloud save failed: " + err);
                 }
             });
         }
 
         function hardReset() {
-            if (confirm("Reset to 0?")) {
+            if (confirm("Reset everything to 0?")) {
                 score = 0;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
@@ -97,7 +102,7 @@
 
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Can you beat my Bert score?`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
         }
 
         updateUI();
