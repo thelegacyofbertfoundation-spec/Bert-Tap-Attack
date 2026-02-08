@@ -5,14 +5,14 @@ import logging
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# --- 1. CONFIGURATION ---
+# --- CONFIGURATION ---
 GITHUB_URL = "https://thelegacyofbertfoundation-spec.github.io/Bert-Tap-Attack/" 
 TOKEN = os.getenv('BOT_TOKEN')
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- 2. DATABASE LOGIC ---
+# --- DATABASE LOGIC ---
 def init_db():
     conn = sqlite3.connect('bert_data.db')
     c = conn.cursor()
@@ -37,28 +37,29 @@ def get_top_10():
     conn.close()
     return data
 
-# --- 3. BOT HANDLERS ---
+# --- BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sets the Menu Button (paperclip area) and sends the Keyboard Button."""
+    """Refreshes the Menu Button and sends a Keyboard Button."""
     user = update.effective_user
     
-    # Force the Menu Button to update every time /start is called
+    # This places the 'Play' button directly next to the text input bar
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonWebApp(text="🕹️ Play Bert", web_app=WebAppInfo(url=GITHUB_URL))
     )
     
+    # Large button at the bottom
     keyboard = [[KeyboardButton(text="🎮 Play Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Hey {user.first_name}! 🥊\n\nI've cleared the session. Launch the game from the button next to your text bar to enable Sync & Rank!",
+        f"Hey {user.first_name}! 🥊\n\nBuild updated. Please use the button next to your text bar to ensure Sync & Rank works!",
         reply_markup=reply_markup
     )
 
 async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processes the 'Sync & Rank' signal from the game."""
-    logger.info(">>> SUCCESS: WEB_APP_DATA RECEIVED <<<")
+    """Processes 'Sync & Rank' data and displays the Global Leaderboard."""
+    logger.info(">>> SUCCESS: DATA RECEIVED FROM GAME <<<")
     try:
         if update.effective_message.web_app_data:
             raw_data = update.effective_message.web_app_data.data
@@ -73,9 +74,11 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lb_text += f"{i}. {name}: {s:,} 💰\n"
             
             await update.message.reply_text(lb_text, parse_mode='Markdown')
+            
     except Exception as e:
-        logger.error(f"Sync logic error: {e}")
+        logger.error(f"Sync failed: {e}")
 
+# --- EXECUTION ---
 if __name__ == '__main__':
     init_db()
     if not TOKEN:
@@ -85,5 +88,5 @@ if __name__ == '__main__':
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
         
-        # This is vital for Render to prevent Conflict errors
+        # Use drop_pending_updates=True to prevent Conflict errors
         app.run_polling(drop_pending_updates=True)
