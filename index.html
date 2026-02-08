@@ -11,14 +11,14 @@
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
         #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
         #face:active { transform: scale(0.94); }
-        .btn-group { display: none; gap: 10px; margin-top: 30px; }
+        .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         #loader { font-weight: bold; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
-    <div id="loader">Waking up Bert...</div>
+    <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container" style="display:none;">
         <img src="coin.png" id="coin-icon">
@@ -30,23 +30,25 @@
     <div class="btn-group" id="ui-buttons">
         <button class="btn" onclick="syncRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
+        <button id="reset-btn" style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Wipe Data & Reset to 0</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
+        // HARD INITIALIZATION TO ZERO
         let score = 0;
         let tapPower = 1;
 
-        // LOAD DATA FROM CLOUD
+        // LOAD DATA
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
-                // If cloud is empty, it stays 0.
-                score = Number(values.score) || 0;
-                tapPower = Number(values.tapPower) || 1;
+                // We strictly parse the values. If they are missing, it stays at 0.
+                if (values.score) score = parseInt(values.score);
+                if (values.tapPower) tapPower = parseInt(values.tapPower);
             }
-            // Transition from Loader to Game
+            
             document.getElementById('loader').style.display = 'none';
             document.getElementById('score-container').style.display = 'block';
             document.getElementById('face').style.display = 'block';
@@ -65,19 +67,25 @@
         };
 
         function syncRank() {
-            // 1. Save to CloudStorage first
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    // 2. Send JSON to Bot. 
-                    // This ONLY works if you launched via the Reply Keyboard or Menu Button.
                     tg.sendData(JSON.stringify({ "score": score }));
-                } else {
-                    tg.showAlert("Cloud sync failed.");
                 }
             });
+        }
+
+        function hardReset() {
+            if (confirm("This will wipe all taps and reset to 0. Are you sure?")) {
+                score = 0;
+                tapPower = 1;
+                tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
+                    updateUI();
+                    tg.showAlert("Data wiped! Sync & Rank to clear leaderboard.");
+                });
+            }
         }
 
         function inviteFriend() {
