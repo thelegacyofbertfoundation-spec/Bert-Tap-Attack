@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.7-COMMANDS-READY</div>
+    <div id="build-tag">BUILD: V2.8-SYNC-READY</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -43,7 +43,6 @@
         let score = 0;
         let tapPower = 1;
 
-        // Load data from Telegram CloudStorage
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -67,21 +66,22 @@
         };
 
         function syncAndRank() {
-            tg.CloudStorage.setItem('score', String(score), (err, success) => {
+            // Save BOTH items to the cloud storage
+            tg.CloudStorage.setItems({
+                'score': String(score),
+                'tapPower': String(tapPower)
+            }, (err, success) => {
                 if (success) {
-                    try {
-                        // sendData triggers handle_sync in the bot
-                        tg.sendData(JSON.stringify({ "score": score }));
-                        setTimeout(() => { tg.close(); }, 300);
-                    } catch (e) {
-                        alert("Sync Blocked: Did you launch via the Bot Button?");
-                    }
+                    // Send the data to the bot and close
+                    // We wrap the data in a very simple JSON object
+                    tg.sendData(JSON.stringify({ "score": score }));
+                    setTimeout(() => { tg.close(); }, 300);
                 }
             });
         }
 
         function hardReset() {
-            if (confirm("Reset to 0?")) {
+            if (confirm("Reset everything?")) {
                 score = 0;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
@@ -92,7 +92,7 @@
 
         function inviteFriend() {
             const botUrl = "https://t.me/BertTapBot"; 
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Can you beat my Bert score?`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=Join me in Bert Tap Attack!`);
         }
 
         updateUI();
