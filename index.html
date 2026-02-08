@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
-        #build-tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
+        #tag { position: fixed; top: 10px; font-size: 0.7rem; color: #d35400; font-weight: bold; }
         #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; display: none; }
         #coin-icon { width: 50px; height: 50px; margin-right: 12px; vertical-align: middle; }
         #face { width: 260px; border-radius: 25px; cursor: pointer; transition: transform 0.05s; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; }
@@ -15,12 +15,11 @@
         .btn-group { display: none; flex-direction: column; gap: 8px; margin-top: 25px; }
         .btn { background: #d35400; color: white; border: none; padding: 12px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         #loader { font-weight: bold; font-size: 1.2rem; }
-        #sync-status { font-size: 0.8rem; margin-top: 5px; color: #d35400; height: 15px; }
     </style>
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.9-FORCE-CLOSE</div>
+    <div id="tag">BUILD: V3.1-MINI-APP-ON</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -31,10 +30,9 @@
     <img id="face" src="face.png">
 
     <div class="btn-group" id="ui-buttons">
-        <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
-        <div id="sync-status"></div>
+        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
-        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Hard Reset</button>
+        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Reset Progress</button>
     </div>
 
     <script>
@@ -45,6 +43,7 @@
         let score = 0;
         let tapPower = 1;
 
+        // LOAD FROM CLOUDSTORAGE
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -57,9 +56,7 @@
             updateUI();
         });
 
-        function updateUI() {
-            document.getElementById('score').innerText = score.toLocaleString();
-        }
+        function updateUI() { document.getElementById('score').innerText = score.toLocaleString(); }
 
         document.getElementById('face').onclick = () => {
             score += tapPower;
@@ -67,33 +64,22 @@
             updateUI();
         };
 
-        function sendToBot() {
-            try {
-                // Send JSON and close app
-                tg.sendData(JSON.stringify({ "score": score }));
-                setTimeout(() => { tg.close(); }, 300);
-            } catch (e) {
-                alert("Launch via the Bot button next to the text bar!");
-            }
-        }
-
         function syncAndRank() {
-            const status = document.getElementById('sync-status');
-            status.innerText = "Syncing...";
-            
-            // 1. Safety Timeout: Force send after 1.5 seconds if cloud is slow
-            const forceTimeout = setTimeout(() => {
-                status.innerText = "Cloud slow, forcing sync...";
-                sendToBot();
-            }, 1500);
-
-            // 2. Try normal Cloud Save
+            // 1. Save locally to CloudStorage first
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
-                clearTimeout(forceTimeout); // Cancel timeout if cloud responds fast
-                sendToBot();
+                if (success) {
+                    try {
+                        // 2. Send data signal to bot
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        // 3. Close app
+                        setTimeout(() => { tg.close(); }, 300);
+                    } catch (e) {
+                        alert("Sync Blocked: Did you use the bot button?");
+                    }
+                }
             });
         }
 
