@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <div id="build-tag">BUILD: V2.8-SYNC-READY</div>
+    <div id="build-tag">BUILD: V2.9-STABLE</div>
     <div id="loader">Syncing Cloud...</div>
 
     <div id="score-container">
@@ -43,6 +43,7 @@
         let score = 0;
         let tapPower = 1;
 
+        // Load data safely
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -66,16 +67,25 @@
         };
 
         function syncAndRank() {
-            // Save BOTH items to the cloud storage
-            tg.CloudStorage.setItems({
+            // First: Save to CloudStorage
+            const saveData = {
                 'score': String(score),
                 'tapPower': String(tapPower)
-            }, (err, success) => {
+            };
+
+            tg.CloudStorage.setItems(saveData, (err, success) => {
                 if (success) {
-                    // Send the data to the bot and close
-                    // We wrap the data in a very simple JSON object
-                    tg.sendData(JSON.stringify({ "score": score }));
-                    setTimeout(() => { tg.close(); }, 300);
+                    try {
+                        // Second: Send data to bot and close
+                        const payload = JSON.stringify({ score: score });
+                        tg.sendData(payload);
+                        // 300ms delay to ensure data leaves before closing
+                        setTimeout(() => { tg.close(); }, 300);
+                    } catch (e) {
+                        alert("Sync Signal Error: " + e.message);
+                    }
+                } else {
+                    alert("Cloud Save Error: " + err);
                 }
             });
         }
@@ -85,7 +95,7 @@
                 score = 0;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
-                    tg.showAlert("Wiped!");
+                    tg.showAlert("Cloud Wiped!");
                 });
             }
         }
