@@ -6,21 +6,24 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; }
-        #coin-icon { width: 120px; height: 120px; margin-top: 20px; }
-        #score { font-size: 3.5rem; font-weight: bold; }
-        #face { width: 100vw; max-width: 500px; cursor: pointer; transition: transform 0.05s; }
-        #face:active { transform: scale(0.95); }
-        #energy-container { width: 85%; background: #333; height: 15px; border-radius: 10px; overflow: hidden; }
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+        #coin-icon { width: 120px; height: 120px; margin-top: 15px; }
+        #score { font-size: 3rem; font-weight: bold; }
+        #face { width: 100vw; cursor: pointer; transition: transform 0.05s; }
+        #face:active { transform: scale(0.96); }
+        #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
-        .footer { width: 100%; padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
+        .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1rem; }
     </style>
 </head>
 <body>
 
-    <img src="coin.png" id="coin-icon">
-    <div id="score">0</div>
+    <div style="margin-top: 10px; font-size: 0.7rem; opacity: 0.5;">BUILD: V3.5-FINAL</div>
+    <div>
+        <img src="coin.png" id="coin-icon">
+        <div id="score">0</div>
+    </div>
 
     <img id="face" src="face.png">
 
@@ -36,7 +39,6 @@
 
         let score = 0, energy = 100;
 
-        // LOAD FROM CLOUD
         tg.CloudStorage.getItems(['score'], (err, values) => {
             if (!err) score = parseInt(values.score) || 0;
             updateUI();
@@ -59,14 +61,13 @@
         };
 
         function syncAndRank() {
-            // 1. Save to Cloud
+            // Save to CloudStorage then sendData to Bot
             tg.CloudStorage.setItem('score', String(score), (err, success) => {
-                // 2. ALWAYS try to send data and close
                 try {
                     tg.sendData(JSON.stringify({ "score": score }));
                     setTimeout(() => { tg.close(); }, 300);
                 } catch (e) {
-                    alert("Sync Blocked. Please use the chat button.");
+                    tg.showAlert("Launch using the CHAT BUTTON, not the menu icon.");
                 }
             });
         }
