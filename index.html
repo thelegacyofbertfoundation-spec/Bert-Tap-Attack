@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bert Tap Attack</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js?5"></script>
     <style>
         body { background: radial-gradient(circle, #fcf3cf, #f7dc6f); color: #5d4037; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
         #score-container { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
@@ -30,11 +30,14 @@
     <div class="btn-group" id="ui-buttons">
         <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
-        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Wipe Data & Reset to 0</button>
+        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Hard Reset (0)</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
+        
+        // This ensures the app is ready before we do anything
+        tg.ready();
         tg.expand();
 
         let score = 0;
@@ -64,30 +67,36 @@
         };
 
         function syncAndRank() {
-            // Save to CloudStorage
+            // First: Save to Cloud
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
                     try {
-                        // 1. Attempt to send data
-                        tg.sendData(JSON.stringify({ "score": score }));
-                        // 2. Fallback: Force close after 100ms
-                        setTimeout(() => { tg.close(); }, 100);
+                        // THE CRITICAL SIGNAL
+                        const dataToSend = JSON.stringify({ "score": score });
+                        tg.sendData(dataToSend);
+                        
+                        // If it hasn't closed in 200ms, force close it
+                        setTimeout(() => { tg.close(); }, 200);
+                        
                     } catch (e) {
-                        tg.showAlert("Sync failed. Are you using the bot button?");
+                        // This will tell us EXACTLY what is wrong on your screen
+                        tg.showAlert("JS Error: " + e.message);
                     }
+                } else {
+                    tg.showAlert("Cloud save failed.");
                 }
             });
         }
 
         function hardReset() {
-            if (confirm("Reset everything?")) {
+            if (confirm("Reset to 0?")) {
                 score = 0;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
-                    tg.showAlert("Cloud wiped!");
+                    tg.showAlert("Reset successful!");
                 });
             }
         }
