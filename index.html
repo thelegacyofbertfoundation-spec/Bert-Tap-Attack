@@ -18,7 +18,7 @@
 </head>
 <body>
 
-    <div id="loader">Syncing Cloud...</div>
+    <div id="loader">Waking up Bert...</div>
 
     <div id="score-container" style="display:none;">
         <img src="coin.png" id="coin-icon">
@@ -28,27 +28,24 @@
     <img id="face" src="face.png">
 
     <div class="btn-group" id="ui-buttons">
-        <button class="btn" onclick="syncRank()">💾 Sync & Rank</button>
+        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
         <button class="btn" style="background:#2980b9;" onclick="inviteFriend()">📢 Invite</button>
-        <button id="reset-btn" style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Wipe Data & Reset to 0</button>
+        <button style="background:none; color:#a04000; font-size:0.7rem; border:none; margin-top:10px;" onclick="hardReset()">Wipe Data & Reset to 0</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // HARD INITIALIZATION TO ZERO
         let score = 0;
         let tapPower = 1;
 
         // LOAD DATA
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
-                // We strictly parse the values. If they are missing, it stays at 0.
-                if (values.score) score = parseInt(values.score);
-                if (values.tapPower) tapPower = parseInt(values.tapPower);
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
             }
-            
             document.getElementById('loader').style.display = 'none';
             document.getElementById('score-container').style.display = 'block';
             document.getElementById('face').style.display = 'block';
@@ -66,24 +63,31 @@
             updateUI();
         };
 
-        function syncRank() {
+        function syncAndRank() {
+            // Save to CloudStorage
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    tg.sendData(JSON.stringify({ "score": score }));
+                    try {
+                        // 1. Attempt to send data
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        // 2. Fallback: Force close after 100ms
+                        setTimeout(() => { tg.close(); }, 100);
+                    } catch (e) {
+                        tg.showAlert("Sync failed. Are you using the bot button?");
+                    }
                 }
             });
         }
 
         function hardReset() {
-            if (confirm("This will wipe all taps and reset to 0. Are you sure?")) {
+            if (confirm("Reset everything?")) {
                 score = 0;
-                tapPower = 1;
                 tg.CloudStorage.removeItems(['score', 'tapPower'], () => {
                     updateUI();
-                    tg.showAlert("Data wiped! Sync & Rank to clear leaderboard.");
+                    tg.showAlert("Cloud wiped!");
                 });
             }
         }
