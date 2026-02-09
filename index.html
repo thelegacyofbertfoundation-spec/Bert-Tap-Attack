@@ -203,6 +203,11 @@
         let totalTaps = 0;
         let isLoading = true;
         
+        if (!tg.initData) {
+            console.error('Not running in Telegram WebApp');
+            document.getElementById('loading').innerHTML = '<div>Please open this game through Telegram bot</div>';
+        }
+        
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
             if (!err && values) {
                 score = parseInt(values.score) || 0;
@@ -269,6 +274,8 @@
             
             if (isLoading || btn.disabled) return;
             
+            console.log('Sync started, score:', score);
+            
             btn.innerText = "⏳ SAVING...";
             btn.disabled = true;
             
@@ -277,25 +284,35 @@
                 'tapPower': String(tapPower),
                 'totalTaps': String(totalTaps)
             }, (err, success) => {
+                console.log('Cloud save result:', success, 'Error:', err);
+                
                 if (success) {
                     btn.innerText = "🚀 RANKING...";
                     
+                    const dataToSend = JSON.stringify({ 
+                        score: score,
+                        totalTaps: totalTaps
+                    });
+                    
+                    console.log('Sending data to bot:', dataToSend);
+                    
                     try {
-                        tg.sendData(JSON.stringify({ 
-                            score: score,
-                            totalTaps: totalTaps
-                        }));
+                        tg.sendData(dataToSend);
+                        console.log('Data sent successfully');
                         
                         setTimeout(() => { 
+                            console.log('Closing WebApp');
                             tg.close(); 
-                        }, 700);
+                        }, 1000);
+                        
                     } catch (e) {
                         console.error('Error sending data:', e);
-                        tg.showAlert("Failed to sync. Please try again.");
+                        tg.showAlert("Error: " + e.message);
                         btn.innerText = "💾 SYNC & RANK";
                         btn.disabled = false;
                     }
                 } else {
+                    console.error('Cloud save failed');
                     tg.showAlert("Cloud storage busy. Please try again.");
                     btn.innerText = "💾 SYNC & RANK";
                     btn.disabled = false;

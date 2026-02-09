@@ -211,21 +211,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
-
----
-
-## ✅ **PUSH THIS AND WATCH THE LOGS**
-
-1. **Update bot.py with the code above**
-2. **Push to GitHub**
-3. **Wait for Render to redeploy**
-4. **Check the logs** - you should see more detailed logging now including the exact port
-
-The logs should show something like:
-```
-==================================================
-Starting Bert Tap Attack Bot
-Port: 10000
-Webhook URL: https://bert-tap-attack.onrender.com
-==================================================
