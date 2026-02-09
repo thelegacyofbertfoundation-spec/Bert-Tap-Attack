@@ -122,50 +122,49 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error("Leaderboard command error: %s", e)
         await update.message.reply_text("❌ Error loading leaderboard")
 
-async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle score sync from web app"""
+async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle WebApp data from message"""
     logger.info("=" * 50)
-    logger.info("WEBAPP DATA RECEIVED!")
-    logger.info("User ID: %s", update.effective_user.id)
-    logger.info("Update type: %s", type(update))
-    logger.info("Has web_app_data: %s", hasattr(update.effective_message, 'web_app_data'))
-    if hasattr(update.effective_message, 'web_app_data'):
-        logger.info("Raw data: %s", update.effective_message.web_app_data.data)
+    logger.info("MESSAGE WEBAPP DATA RECEIVED!")
+    logger.info("User: %s", update.effective_user.first_name)
     logger.info("=" * 50)
-    
-    uid = update.effective_user.id
-    now = time.time()
-    
-    if now - last_sync[uid] < 5:
-        await update.message.reply_text("⏳ Please wait 5 seconds before syncing again.")
-        return
     
     try:
         data = json.loads(update.effective_message.web_app_data.data)
         score = data.get('score', 0)
         
+        logger.info("Parsed score: %s", score)
+        
         if not isinstance(score, int) or score < 0:
-            await update.message.reply_text("⚠️ Invalid score detected!")
-            logger.warning("Invalid score from user %s: %s", uid, score)
+            await update.message.reply_text("⚠️ Invalid score!")
             return
         
         if score > 10000000:
-            await update.message.reply_text("⚠️ Score too high! Possible cheating detected!")
-            logger.warning("Suspiciously high score from user %s: %s", uid, score)
+            await update.message.reply_text("⚠️ Score too high!")
             return
         
-        update_db(uid, update.effective_user.first_name, score)
-        last_sync[uid] = now
+        update_db(update.effective_user.id, update.effective_user.first_name, score)
+        await update.message.reply_text("✅ Score Synced!\n\n" + get_rank())
         
-        await update.message.reply_text("✅ Score Synced Successfully!\n\n" + get_rank())
-        logger.info("Successfully synced score for user %s: %s", uid, score)
-        
-    except json.JSONDecodeError as e:
-        logger.error("JSON decode error: %s", e)
-        await update.message.reply_text("❌ Invalid data format. Please try again.")
     except Exception as e:
-        logger.error("Error handling web app data: %s", e)
-        await update.message.reply_text("❌ Sync failed. Please try again.")
+        logger.error("Error handling webapp data: %s", e)
+        await update.message.reply_text("❌ Sync failed")
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle callback queries (including WebApp data)"""
+    query = update.callback_query
+    
+    logger.info("=" * 50)
+    logger.info("CALLBACK QUERY RECEIVED!")
+    logger.info("User: %s", update.effective_user.first_name)
+    logger.info("Data: %s", query.data if query.data else "None")
+    
+    # Check if this is WebApp data
+    if hasattr(query, 'web_app_data') and query.web_app_data:
+        logger.info("WebApp data in callback: %s", query.web_app_data)
+    logger.info("=" * 50)
+    
+    await query.answer()
 
 def main():
     """Main function to run the bot"""
@@ -179,9 +178,17 @@ def main():
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_data))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+    app.add_handler(CallbackQueryHandler(handle_callback))
     
     logger.info("Bot starting in polling mode...")
+    logger.info("Handlers registered:")
+    logger.info("  - /start")
+    logger.info("  - /leaderboard")
+    logger.info("  - WebApp data (message)")
+    logger.info("  - Callback queries")
+    logger.info("=" * 50)
+    
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
