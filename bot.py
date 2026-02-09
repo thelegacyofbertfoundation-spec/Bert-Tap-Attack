@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.set_chat_menu_button(chat_id=update.effective_chat.id, menu_button=MenuButtonDefault())
     keyboard = [[KeyboardButton(text="🥊 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(f"Hey <b>{user.first_name}</b>! 🥊\nV4.0 is live. Play and Sync to rank!", reply_markup=reply_markup, parse_mode='HTML')
+    await update.message.reply_text(f"Hey <b>{user.first_name}</b>! 🥊\nV4.1 is live. Play and Sync to rank!", reply_markup=reply_markup, parse_mode='HTML')
 
 async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_leaderboard_text(), parse_mode='HTML')
