@@ -203,12 +203,13 @@
         let totalTaps = 0;
         let isLoading = true;
         
-        if (!tg.initData) {
-            console.error('Not running in Telegram WebApp');
-            document.getElementById('loading').innerHTML = '<div>Please open this game through Telegram bot</div>';
-        }
+        console.log('Telegram WebApp initialized');
+        console.log('Platform:', tg.platform);
         
+        // Try to load from cloud storage (non-blocking)
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
+            console.log('Cloud storage load - Error:', err, 'Values:', values);
+            
             if (!err && values) {
                 score = parseInt(values.score) || 0;
                 tapPower = parseInt(values.tapPower) || 1;
@@ -219,6 +220,16 @@
             document.getElementById('loading').classList.add('hidden');
         });
         
+        // Fallback: If cloud storage takes too long, just start the game
+        setTimeout(() => {
+            if (isLoading) {
+                console.log('Cloud storage timeout - starting anyway');
+                isLoading = false;
+                document.getElementById('loading').classList.add('hidden');
+                updateUI();
+            }
+        }, 3000);
+        
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
             document.getElementById('e-val').innerText = Math.floor(energy);
@@ -226,6 +237,7 @@
             document.getElementById('tap-counter').innerText = `Total Taps: ${totalTaps.toLocaleString()}`;
         }
         
+        // Energy regeneration
         setInterval(() => { 
             if (energy < 100) { 
                 energy = Math.min(100, energy + 1);
@@ -233,19 +245,20 @@
             } 
         }, 1000);
         
+        // Auto-save every 30 seconds (non-blocking)
         setInterval(() => {
             if (!isLoading) {
                 saveToCloud();
             }
         }, 30000);
         
-        function saveToCloud(callback) {
+        function saveToCloud() {
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
-            if (callback) callback();
         }
         
+        // Tap handler
         document.getElementById('face').addEventListener('click', function(e) {
             if (energy >= 1) {
                 score += tapPower;
@@ -269,6 +282,7 @@
             }
         });
         
+        // SYNC AND RANK - SIMPLIFIED VERSION
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
             
@@ -276,54 +290,53 @@
             
             console.log('Sync started, score:', score);
             
-            btn.innerText = "⏳ SAVING...";
+            btn.innerText = "🚀 RANKING...";
             btn.disabled = true;
             
-            tg.CloudStorage.setItems({
-                'score': String(score), 
-                'tapPower': String(tapPower),
-                'totalTaps': String(totalTaps)
-            }, (err, success) => {
-                console.log('Cloud save result:', success, 'Error:', err);
-                
-                if (success) {
-                    btn.innerText = "🚀 RANKING...";
-                    
-                    const dataToSend = JSON.stringify({ 
-                        score: score,
-                        totalTaps: totalTaps
-                    });
-                    
-                    console.log('Sending data to bot:', dataToSend);
-                    
-                    try {
-                        tg.sendData(dataToSend);
-                        console.log('Data sent successfully');
-                        
-                        setTimeout(() => { 
-                            console.log('Closing WebApp');
-                            tg.close(); 
-                        }, 1000);
-                        
-                    } catch (e) {
-                        console.error('Error sending data:', e);
-                        tg.showAlert("Error: " + e.message);
-                        btn.innerText = "💾 SYNC & RANK";
-                        btn.disabled = false;
-                    }
-                } else {
-                    console.error('Cloud save failed');
-                    tg.showAlert("Cloud storage busy. Please try again.");
-                    btn.innerText = "💾 SYNC & RANK";
-                    btn.disabled = false;
-                }
+            // Prepare data
+            const dataToSend = JSON.stringify({ 
+                score: score,
+                totalTaps: totalTaps
             });
+            
+            console.log('Sending data to bot:', dataToSend);
+            
+            // Try to save to cloud in background (don't wait for it)
+            try {
+                tg.CloudStorage.setItems({
+                    'score': String(score), 
+                    'tapPower': String(tapPower),
+                    'totalTaps': String(totalTaps)
+                });
+            } catch (e) {
+                console.log('Cloud save failed (non-critical):', e);
+            }
+            
+            // Send data to bot immediately
+            try {
+                tg.sendData(dataToSend);
+                console.log('Data sent to bot');
+                
+                // Close after brief delay
+                setTimeout(() => { 
+                    console.log('Closing WebApp');
+                    tg.close(); 
+                }, 500);
+                
+            } catch (e) {
+                console.error('Error sending data:', e);
+                tg.showAlert("Error: " + e.message);
+                btn.innerText = "💾 SYNC & RANK";
+                btn.disabled = false;
+            }
         }
         
+        // Save on close
         window.addEventListener('beforeunload', () => {
             saveToCloud();
         });
         
+        // Prevent zoom
         document.addEventListener('gesturestart', function(e) {
             e.preventDefault();
         });
