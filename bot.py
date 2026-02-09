@@ -4,8 +4,8 @@ import json
 import logging
 import time
 from collections import defaultdict
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, ReplyKeyboardRemove
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Environment variables
 TOKEN = os.getenv('BOT_TOKEN')
@@ -24,11 +24,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Rate limiting
 last_sync = defaultdict(float)
 
 def init_db():
-    """Initialize database table"""
     try:
         conn = psycopg.connect(DATABASE_URL)
         c = conn.cursor()
@@ -47,7 +45,6 @@ def init_db():
         logger.error("Database initialization error: %s", e)
 
 def update_db(uid, name, score):
-    """Update user score in database"""
     try:
         conn = psycopg.connect(DATABASE_URL)
         c = conn.cursor()
@@ -65,7 +62,6 @@ def update_db(uid, name, score):
         raise
 
 def get_rank():
-    """Get top 10 leaderboard"""
     try:
         conn = psycopg.connect(DATABASE_URL)
         c = conn.cursor()
@@ -92,48 +88,47 @@ def get_rank():
         return "❌ Error loading leaderboard"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Start command handler"""
-    logger.info("START command received from user %s", update.effective_user.id)
+    logger.info("START command from user %s", update.effective_user.id)
     try:
-        # Create inline button with WebApp
-        keyboard = [[InlineKeyboardButton("🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # KEYBOARD BUTTON (not inline) - this is the key!
+        keyboard = [[KeyboardButton(text="🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard, 
+            resize_keyboard=True,  # Make it smaller
+            one_time_keyboard=False  # Keep it visible
+        )
         
         welcome_text = (
-            "🎮 Welcome to Bert Tap Attack! 🎮\n\n"
-            "Tap Bert's face to earn points!\n"
-            "Click the button below to start playing.\n\n"
+            "🎮 Bert Tap Attack 🎮\n\n"
+            "Click the 🕹️ PLAY BERT button below to start!\n\n"
             "Commands:\n"
-            "/leaderboard - View top players\n"
+            "/leaderboard - View rankings\n"
             "/start - Show this message"
         )
         
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
-        logger.info("START response sent to user %s", update.effective_user.id)
+        logger.info("START sent to user %s", update.effective_user.id)
     except Exception as e:
-        logger.error("Start command error: %s", e)
+        logger.error("Start error: %s", e)
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Leaderboard command handler"""
-    logger.info("LEADERBOARD command received from user %s", update.effective_user.id)
+    logger.info("LEADERBOARD from user %s", update.effective_user.id)
     try:
         await update.message.reply_text(get_rank())
     except Exception as e:
-        logger.error("Leaderboard command error: %s", e)
-        await update.message.reply_text("❌ Error loading leaderboard")
+        logger.error("Leaderboard error: %s", e)
 
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle WebApp data from message"""
-    logger.info("=" * 50)
-    logger.info("MESSAGE WEBAPP DATA RECEIVED!")
-    logger.info("User: %s", update.effective_user.first_name)
-    logger.info("=" * 50)
+    logger.info("=" * 60)
+    logger.info("🎯 WEBAPP DATA RECEIVED!")
+    logger.info("User: %s (%s)", update.effective_user.first_name, update.effective_user.id)
+    logger.info("=" * 60)
     
     try:
         data = json.loads(update.effective_message.web_app_data.data)
         score = data.get('score', 0)
         
-        logger.info("Parsed score: %s", score)
+        logger.info("📊 Score: %s", score)
         
         if not isinstance(score, int) or score < 0:
             await update.message.reply_text("⚠️ Invalid score!")
@@ -144,33 +139,17 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         
         update_db(update.effective_user.id, update.effective_user.first_name, score)
-        await update.message.reply_text("✅ Score Synced!\n\n" + get_rank())
+        await update.message.reply_text("✅ Score Synced Successfully!\n\n" + get_rank())
+        logger.info("✅ Score saved: %s", score)
         
     except Exception as e:
-        logger.error("Error handling webapp data: %s", e)
+        logger.error("❌ Error: %s", e)
         await update.message.reply_text("❌ Sync failed")
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle callback queries (including WebApp data)"""
-    query = update.callback_query
-    
-    logger.info("=" * 50)
-    logger.info("CALLBACK QUERY RECEIVED!")
-    logger.info("User: %s", update.effective_user.first_name)
-    logger.info("Data: %s", query.data if query.data else "None")
-    
-    # Check if this is WebApp data
-    if hasattr(query, 'web_app_data') and query.web_app_data:
-        logger.info("WebApp data in callback: %s", query.web_app_data)
-    logger.info("=" * 50)
-    
-    await query.answer()
-
 def main():
-    """Main function to run the bot"""
-    logger.info("=" * 50)
-    logger.info("Starting Bert Tap Attack Bot (POLLING MODE)")
-    logger.info("=" * 50)
+    logger.info("=" * 60)
+    logger.info("🚀 Bert Tap Attack Bot Starting (POLLING)")
+    logger.info("=" * 60)
     
     init_db()
     
@@ -179,15 +158,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
-    app.add_handler(CallbackQueryHandler(handle_callback))
     
-    logger.info("Bot starting in polling mode...")
-    logger.info("Handlers registered:")
-    logger.info("  - /start")
-    logger.info("  - /leaderboard")
-    logger.info("  - WebApp data (message)")
-    logger.info("  - Callback queries")
-    logger.info("=" * 50)
+    logger.info("✅ Handlers registered")
+    logger.info("=" * 60)
     
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
