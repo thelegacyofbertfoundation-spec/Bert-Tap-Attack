@@ -7,8 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-        #header { margin-top: 20px; }
-        #coin-icon { width: 120px; height: 120px; }
+        #coin-icon { width: 120px; height: 120px; margin-top: 20px; }
         #score { font-size: 3.5rem; font-weight: bold; }
         #face { width: 100vw; max-width: 600px; cursor: pointer; transition: transform 0.05s; }
         #face:active { transform: scale(0.95); }
@@ -33,7 +32,7 @@
         tg.ready();
         tg.expand();
 
-        // NATIVE MAIN BUTTON (Much more reliable)
+        // 🛡️ FORTIFIED: Use the Native Main Button
         tg.MainButton.text = "🏆 SYNC & RANK 🏆";
         tg.MainButton.show();
         tg.MainButton.onClick(() => syncAndRank());
@@ -65,20 +64,21 @@
         };
 
         function syncAndRank() {
-            tg.MainButton.showProgress(); // Shows loading spinner on button
+            // 🛡️ FORTIFIED: Fire and Forget. No callbacks. No waiting.
+            tg.MainButton.showProgress(); 
             
-            // 1. Force Cloud Save
+            // 1. Send data to cloud immediately
             tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
 
-            // 2. The "Hard" Send
+            // 2. Send data to bot immediately
+            try {
+                tg.sendData(JSON.stringify({ "score": score }));
+            } catch (e) {}
+
+            // 3. Close the app no matter what after 400ms
             setTimeout(() => {
-                try {
-                    tg.sendData(JSON.stringify({ "score": score }));
-                    setTimeout(() => { tg.close(); }, 500);
-                } catch (e) {
-                    tg.close();
-                }
-            }, 300);
+                tg.close();
+            }, 400);
         }
     </script>
 </body>
