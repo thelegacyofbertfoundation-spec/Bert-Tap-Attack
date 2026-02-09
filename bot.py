@@ -11,7 +11,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = os.getenv('BOT_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-PORT = int(os.getenv('PORT', 10000))
+
+# CRITICAL: Render provides PORT dynamically
+PORT = int(os.environ.get('PORT', 10000))
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable not set!")
@@ -22,7 +24,10 @@ if not DATABASE_URL:
 
 GITHUB_URL = "https://thelegacyofbertfoundation-spec.github.io/Bert-Tap-Attack/"
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Rate limiting
@@ -171,7 +176,11 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Main function to run the bot"""
-    logger.info("Starting bot...")
+    logger.info("=" * 50)
+    logger.info("Starting Bert Tap Attack Bot")
+    logger.info("Port: %s", PORT)
+    logger.info("Webhook URL: %s", WEBHOOK_URL)
+    logger.info("=" * 50)
     
     # Initialize database
     init_db()
@@ -184,18 +193,39 @@ def main():
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_data))
     
-    logger.info("Starting webhook on port %s", PORT)
-    logger.info("Webhook URL: %s/%s", WEBHOOK_URL, TOKEN)
-    
-    # Run webhook for Render deployment
+    # Full webhook URL
     webhook_url_full = WEBHOOK_URL + "/" + TOKEN
     
+    logger.info("Starting webhook server...")
+    logger.info("Listening on: 0.0.0.0:%s", PORT)
+    logger.info("Webhook path: /%s", TOKEN)
+    logger.info("Full webhook URL: %s", webhook_url_full)
+    
+    # Run webhook for Render deployment
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        webhook_url=webhook_url_full,
-        url_path=TOKEN
+        url_path=TOKEN,
+        webhook_url=webhook_url_full
     )
 
 if __name__ == '__main__':
     main()
+```
+
+---
+
+## ✅ **PUSH THIS AND WATCH THE LOGS**
+
+1. **Update bot.py with the code above**
+2. **Push to GitHub**
+3. **Wait for Render to redeploy**
+4. **Check the logs** - you should see more detailed logging now including the exact port
+
+The logs should show something like:
+```
+==================================================
+Starting Bert Tap Attack Bot
+Port: 10000
+Webhook URL: https://bert-tap-attack.onrender.com
+==================================================
