@@ -7,15 +7,14 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-        #header { margin-top: 20px; }
-        #coin-icon { width: 120px; height: 120px; }
+        #coin-icon { width: 120px; height: 120px; margin-top: 20px; }
         #score { font-size: 3.5rem; font-weight: bold; }
         #face { width: 100vw; max-width: 600px; cursor: pointer; transition: transform 0.05s; }
         #face:active { transform: scale(0.95); }
         #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; margin: 0 auto; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
         .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; cursor: pointer; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
     </style>
 </head>
 <body>
@@ -62,21 +61,26 @@
 
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
-            btn.innerText = "🚀 SENDING...";
+            btn.innerText = "⏳ SAVING...";
             btn.disabled = true;
 
-            // 1. SIGNAL THE BOT FIRST (Priority #1)
-            try {
-                tg.sendData(JSON.stringify({ "score": score }));
-            } catch (e) { console.log("Bot Signal failed"); }
-
-            // 2. BACKGROUND CLOUD SAVE (Don't wait for success)
-            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
-
-            // 3. FORCE CLOSE (Firm Eject)
-            setTimeout(() => {
-                tg.close();
-            }, 600);
+            // 1. BLOCKING SAVE: Wait for Cloud success
+            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
+                if (success) {
+                    btn.innerText = "🚀 RANKING...";
+                    // 2. Only now send to bot
+                    try {
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        setTimeout(() => { tg.close(); }, 700);
+                    } catch (e) {
+                        tg.close();
+                    }
+                } else {
+                    tg.showAlert("Cloud busy. Try once more.");
+                    btn.innerText = "💾 SYNC & RANK";
+                    btn.disabled = false;
+                }
+            });
         }
     </script>
 </body>
