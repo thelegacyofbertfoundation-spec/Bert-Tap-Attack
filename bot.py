@@ -154,10 +154,24 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info("=" * 60)
 
 def main():
+    # Get PORT from environment (Render sets this automatically)
+    port_env = os.getenv('PORT')
+    
     logger.info("=" * 60)
     logger.info("🚀 BERT TAP BOT - WEBHOOK MODE (PRO)")
-    logger.info("Environment PORT variable: %s", os.getenv('PORT'))
-    logger.info("Using PORT: %s", PORT)
+    logger.info("🔍 DEBUG INFO:")
+    logger.info("  - PORT env var: %s (type: %s)", port_env, type(port_env))
+    logger.info("  - All env vars with 'PORT': %s", {k: v for k, v in os.environ.items() if 'PORT' in k.upper()})
+    
+    # Determine port
+    if port_env:
+        actual_port = int(port_env)
+        logger.info("  ✅ Using Render-assigned PORT: %s", actual_port)
+    else:
+        actual_port = 10000
+        logger.warning("  ⚠️  PORT not set by Render! Using fallback: %s", actual_port)
+        logger.warning("  ⚠️  This may cause 404 errors!")
+    
     logger.info("Webhook: %s", WEBHOOK_URL)
     logger.info("=" * 60)
     
@@ -173,27 +187,15 @@ def main():
     
     logger.info("🔗 Starting webhook server...")
     logger.info("🌐 Webhook URL: %s", webhook_url)
-    logger.info("🔌 Listening on 0.0.0.0:%s", PORT)
+    logger.info("🔌 Listening on 0.0.0.0:%s", actual_port)
     logger.info("📍 Webhook path: /%s", TOKEN)
-    
-    # Health check endpoint
-    from aiohttp import web
-    
-    async def health(request):
-        return web.Response(text="OK")
-    
-    # Create custom web app with health endpoint
-    webapp = web.Application()
-    webapp.router.add_get('/', health)
-    webapp.router.add_get('/health', health)
     
     app.run_webhook(
         listen="0.0.0.0",
-        port=PORT,
+        port=actual_port,
         url_path=TOKEN,
         webhook_url=webhook_url,
-        allowed_updates=Update.ALL_TYPES,
-        web_app=webapp
+        allowed_updates=Update.ALL_TYPES
     )
 
 if __name__ == '__main__':
