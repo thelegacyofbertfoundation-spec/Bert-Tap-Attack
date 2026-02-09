@@ -7,35 +7,52 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-        #coin-icon { width: 120px; height: 120px; margin-top: 15px; }
-        #score { font-size: 3rem; font-weight: bold; }
-        #face { width: 100vw; cursor: pointer; transition: transform 0.05s; }
-        #face:active { transform: scale(0.96); }
+        #header { margin-top: 20px; }
+        #coin-icon { width: 120px; height: 120px; }
+        #score { font-size: 3.5rem; font-weight: bold; }
+        #face { width: 100vw; max-width: 600px; cursor: pointer; transition: transform 0.05s; }
+        #face:active { transform: scale(0.95); }
         #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
         .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1rem; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
+        #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
     </style>
 </head>
 <body>
-    <div style="margin-top: 10px; font-size: 0.7rem; opacity: 0.5;">BUILD: V3.6-IOS-FIX</div>
-    <div>
+
+    <div id="header">
         <img src="coin.png" id="coin-icon">
         <div id="score">0</div>
     </div>
+
     <img id="face" src="face.png">
+
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
-        <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Upgrades</button>
+        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
+
+    <div id="shop-modal">
+        <h2>Gym Upgrades</h2>
+        <p>Power: <span id="pwr-val">1</span></p>
+        <button class="btn" id="up-btn" onclick="buyUpgrade()">Upgrade (Cost: 100)</button>
+        <button class="btn" style="background:#444; margin-top:20px;" onclick="document.getElementById('shop-modal').style.display='none'">Back</button>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
-        let score = 0, energy = 100;
 
-        tg.CloudStorage.getItems(['score'], (err, values) => {
-            if (!err) score = parseInt(values.score) || 0;
+        let score = 0, tapPower = 1, energy = 100;
+
+        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
+            if (!err) {
+                score = parseInt(values.score) || 0;
+                tapPower = parseInt(values.tapPower) || 1;
+            }
             updateUI();
         });
 
@@ -43,32 +60,35 @@
             document.getElementById('score').innerText = score.toLocaleString();
             document.getElementById('e-val').innerText = Math.floor(energy);
             document.getElementById('energy-bar').style.width = energy + "%";
+            document.getElementById('pwr-val').innerText = tapPower;
+            document.getElementById('up-btn').innerText = `Upgrade (Cost: ${tapPower * 100})`;
         }
 
         setInterval(() => { if(energy < 100) { energy += 1; updateUI(); } }, 1000);
 
         document.getElementById('face').onclick = () => {
             if (energy >= 1) {
-                score += 1; energy -= 1;
+                score += tapPower; energy -= 1;
                 tg.HapticFeedback.impactOccurred('medium');
                 updateUI();
             }
         };
 
-        function syncAndRank() {
-            const btn = document.getElementById('sync-btn');
-            btn.innerText = "⌛ Processing...";
-            btn.disabled = true;
+        function buyUpgrade() {
+            let cost = tapPower * 100;
+            if (score >= cost) {
+                score -= cost; tapPower += 1;
+                updateUI();
+            } else { tg.showAlert("Not enough coins!"); }
+        }
 
-            tg.CloudStorage.setItem('score', String(score), (err, success) => {
+        function syncAndRank() {
+            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
                 try {
-                    // Critical for iOS: Give the packet time to leave the device
                     tg.sendData(JSON.stringify({ "score": score }));
                     setTimeout(() => { tg.close(); }, 800); 
                 } catch (e) {
-                    tg.showAlert("Launch using the CHAT BUTTON!");
-                    btn.innerText = "💾 Sync & Rank";
-                    btn.disabled = false;
+                    tg.showAlert("Launch via the CHAT BUTTON!");
                 }
             });
         }
