@@ -4,7 +4,6 @@ import json
 import logging
 import time
 from collections import defaultdict
-from aiohttp import web
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonDefault
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -98,6 +97,7 @@ def get_rank():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command handler"""
+    logger.info("START command received from user %s", update.effective_user.id)
     try:
         await context.bot.set_chat_menu_button(
             chat_id=update.effective_chat.id, 
@@ -119,12 +119,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome_text,
             reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
         )
-        logger.info("User %s started the bot", update.effective_user.id)
+        logger.info("START response sent to user %s", update.effective_user.id)
     except Exception as e:
         logger.error("Start command error: %s", e)
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Leaderboard command handler"""
+    logger.info("LEADERBOARD command received from user %s", update.effective_user.id)
     try:
         await update.message.reply_text(get_rank())
     except Exception as e:
@@ -173,10 +174,6 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error("Error handling web app data: %s", e)
         await update.message.reply_text("❌ Sync failed. Please try again.")
 
-async def health_check(request):
-    """Health check endpoint for Render"""
-    return web.Response(text="OK")
-
 def main():
     """Main function to run the bot"""
     logger.info("=" * 50)
@@ -204,18 +201,13 @@ def main():
     logger.info("Webhook path: /%s", TOKEN)
     logger.info("Full webhook URL: %s", webhook_url_full)
     
-    # Create web app for health check
-    webserver = web.Application()
-    webserver.router.add_get('/', health_check)
-    webserver.router.add_get('/health', health_check)
-    
-    # Run webhook with custom web app
+    # Run webhook - the library handles everything internally
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path=TOKEN,
         webhook_url=webhook_url_full,
-        web_app=webserver
+        allowed_updates=Update.ALL_TYPES
     )
 
 if __name__ == '__main__':
