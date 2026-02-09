@@ -15,7 +15,7 @@
         #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
         .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1rem; cursor: pointer; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; cursor: pointer; }
         #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
     </style>
 </head>
@@ -31,12 +31,12 @@
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
-        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Upgrades</button>
+        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Shop</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
 
     <div id="shop-modal">
-        <h2>Fighter's Gym</h2>
+        <h2>Gym Upgrades</h2>
         <p>Power: <span id="pwr-val">1</span></p>
         <button class="btn" id="up-btn" onclick="buyUpgrade()">Upgrade (Cost: 100)</button>
         <button class="btn" style="background:#444; margin-top:20px;" onclick="document.getElementById('shop-modal').style.display='none'">Back</button>
@@ -48,6 +48,7 @@
 
         let score = 0, tapPower = 1, energy = 100;
 
+        // LOAD FROM CLOUD ON START
         tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
             if (!err) {
                 score = parseInt(values.score) || 0;
@@ -82,37 +83,33 @@
             } else { tg.showAlert("Need more coins!"); }
         }
 
-        function finishSync() {
-            try {
-                tg.sendData(JSON.stringify({ "score": score }));
-                setTimeout(() => { tg.close(); }, 500);
-            } catch (e) {
-                tg.showAlert("Sync Error. Use Chat Button!");
-            }
-        }
-
+        // --- NEW PERSISTENCE LOGIC ---
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
-            btn.innerText = "💾 Saving Progress...";
+            btn.innerText = "💾 Cloud Saving...";
             btn.disabled = true;
 
-            // SAFETY TIMEOUT: If cloud fails, force close after 2.5s
-            const forceClose = setTimeout(() => {
-                console.log("Cloud Timeout - Forcing Close");
-                finishSync();
-            }, 2500);
-
-            // 1. SAVE TO CLOUD FIRST
+            // Step 1: Force Save to CloudStorage
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
                 if (success) {
-                    clearTimeout(forceClose);
-                    // 2. NOW SEND TO BOT AND CLOSE
-                    finishSync();
+                    btn.innerText = "🏆 Ranking...";
+                    // Step 2: Only after Cloud is confirmed, send to Bot
+                    try {
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        // Step 3: Firm delay to ensure data leaves the device
+                        setTimeout(() => { tg.close(); }, 800);
+                    } catch (e) {
+                        tg.showAlert("Bot Signal Blocked. Use Chat Button!");
+                        btn.disabled = false;
+                        btn.innerText = "💾 Sync & Rank";
+                    }
                 } else {
-                    tg.showAlert("Cloud Save Failed. Retrying...");
+                    tg.showAlert("Cloud Busy. Try again in 2 seconds.");
+                    btn.disabled = false;
+                    btn.innerText = "💾 Sync & Rank";
                 }
             });
         }
