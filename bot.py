@@ -11,7 +11,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = os.getenv('BOT_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://bert-tap-attack.onrender.com')
-PORT = int(os.getenv('PORT', 10000))
+PORT = int(os.getenv('PORT', '10000'))
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable not set!")
@@ -156,7 +156,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def main():
     logger.info("=" * 60)
     logger.info("🚀 BERT TAP BOT - WEBHOOK MODE (PRO)")
-    logger.info("Port: %s", PORT)
+    logger.info("Environment PORT variable: %s", os.getenv('PORT'))
+    logger.info("Using PORT: %s", PORT)
     logger.info("Webhook: %s", WEBHOOK_URL)
     logger.info("=" * 60)
     
@@ -172,13 +173,27 @@ def main():
     
     logger.info("🔗 Starting webhook server...")
     logger.info("🌐 Webhook URL: %s", webhook_url)
+    logger.info("🔌 Listening on 0.0.0.0:%s", PORT)
+    logger.info("📍 Webhook path: /%s", TOKEN)
+    
+    # Health check endpoint
+    from aiohttp import web
+    
+    async def health(request):
+        return web.Response(text="OK")
+    
+    # Create custom web app with health endpoint
+    webapp = web.Application()
+    webapp.router.add_get('/', health)
+    webapp.router.add_get('/health', health)
     
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path=TOKEN,
         webhook_url=webhook_url,
-        allowed_updates=Update.ALL_TYPES
+        allowed_updates=Update.ALL_TYPES,
+        web_app=webapp
     )
 
 if __name__ == '__main__':
