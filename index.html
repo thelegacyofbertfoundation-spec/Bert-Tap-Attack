@@ -30,7 +30,7 @@
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
-        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Upgrades</button>
+        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Shop</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
 
@@ -83,25 +83,23 @@
 
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
-            btn.innerText = "💾 SAVING...";
+            btn.innerText = "SYNCING...";
             btn.disabled = true;
 
-            // 1. Force Cloud Save first
-            tg.CloudStorage.setItems({
-                'score': String(score),
-                'tapPower': String(tapPower)
-            }, (err, success) => {
-                // 2. Pulse: Wait 500ms before sending to Bot to let the Cloud finish
-                setTimeout(() => {
-                    try {
-                        tg.sendData(JSON.stringify({ "score": score }));
-                        // 3. Final Eject
-                        setTimeout(() => { tg.close(); }, 500);
-                    } catch (e) {
-                        tg.close();
-                    }
-                }, 500);
-            });
+            // 1. FIRE Cloud Save (Don't wait)
+            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
+
+            // 2. FIRE Bot Signal (Immediately)
+            try {
+                tg.sendData(JSON.stringify({ "score": score }));
+            } catch (e) {
+                console.log("Send data error");
+            }
+
+            // 3. FORCE EJECT (After 800ms)
+            setTimeout(() => {
+                tg.close();
+            }, 800);
         }
     </script>
 </body>
