@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.set_chat_menu_button(chat_id=update.effective_chat.id, menu_button=MenuButtonDefault())
     keyboard = [[KeyboardButton(text="🥊 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(f"Hey <b>{user.first_name}</b>! 🥊\nV4.2 (iPhone Fix) is live.", reply_markup=reply_markup, parse_mode='HTML')
+    await update.message.reply_text(f"Hey <b>{user.first_name}</b>! 🥊\nLaunching V4.3-STABLE.", reply_markup=reply_markup, parse_mode='HTML')
 
 async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_leaderboard_text(), parse_mode='HTML')
@@ -64,14 +64,10 @@ async def handle_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Sync error: {e}")
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error(msg="Exception while handling update:", exc_info=context.error)
-
 if __name__ == '__main__':
     init_db()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_cmd))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_sync))
-    app.add_error_handler(error_handler)
     app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
