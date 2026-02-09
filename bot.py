@@ -118,6 +118,38 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         logger.error("Leaderboard error: %s", e)
 
+async def handle_score_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle score messages sent from WebApp"""
+    if not update.message or not update.message.text:
+        return
+    
+    text = update.message.text
+    
+    # Check if this is a score update message
+    if '#score_' in text and '🎮 SCORE UPDATE' in text:
+        logger.info("=" * 60)
+        logger.info("📊 Score message received from %s", update.effective_user.first_name)
+        
+        try:
+            # Extract score from hashtag
+            score_tag = [word for word in text.split() if word.startswith('#score_')]
+            if score_tag:
+                score = int(score_tag[0].replace('#score_', ''))
+                logger.info("Extracted score: %s", score)
+                
+                # Validate
+                if score < 0 or score > 10000000:
+                    await update.message.reply_text("⚠️ Invalid score!")
+                    return
+                
+                # Save to database
+                update_db(update.effective_user.id, update.effective_user.first_name, score)
+                await update.message.reply_text("✅ Score Saved to Leaderboard!\n\n" + get_rank())
+                logger.info("✅ Score saved successfully")
+                
+        except Exception as e:
+            logger.error("Error parsing score: %s", e)
+
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("=" * 60)
     logger.info("🎯 WEBAPP DATA RECEIVED!")
@@ -157,6 +189,7 @@ def main():
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_score_message))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     
     logger.info("✅ Handlers registered")

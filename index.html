@@ -51,6 +51,8 @@
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
         let score = 0, tapPower = 1, energy = 100, totalTaps = 0, isLoading = true;
+        const userId = tg.initDataUnsafe?.user?.id || 0;
+        const userName = tg.initDataUnsafe?.user?.first_name || 'Player';
         
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
             if (!err && values) {
@@ -89,17 +91,47 @@
             } else { tg.HapticFeedback.notificationOccurred('error'); }
         });
         
-        function syncAndRank() {
+        async function syncAndRank() {
             const btn = document.getElementById('sync-btn');
-            if (isLoading || btn.disabled) return;
-            btn.innerText = "🚀 SENDING..."; btn.disabled = true;
-            const dataToSend = JSON.stringify({ score: score, totalTaps: totalTaps });
+            if (isLoading || btn.disabled || !userId) return;
+            
+            btn.innerText = "⏳ SAVING..."; 
+            btn.disabled = true;
+            
             try {
-                tg.sendData(dataToSend);
-                setTimeout(() => tg.close(), 500);
+                // Save to cloud storage
+                tg.CloudStorage.setItem('score', String(score));
+                tg.CloudStorage.setItem('tapPower', String(tapPower));
+                tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+                
+                btn.innerText = "🚀 SYNCING...";
+                
+                // Send via Telegram Bot API
+                const BOT_TOKEN = '8200621178:AAHCgkzhCYKSd0ESGmAXLePlxvNmABUYZ5M';
+                const message = `🎮 SCORE UPDATE\n\nPlayer: ${userName}\nScore: ${score.toLocaleString()}\nTotal Taps: ${totalTaps.toLocaleString()}\n\n#score_${score}`;
+                
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: userId,
+                        text: message,
+                        parse_mode: 'HTML'
+                    })
+                });
+                
+                if (response.ok) {
+                    btn.innerText = "✅ SYNCED!";
+                    tg.showAlert("Score saved! Check your chat for confirmation.");
+                    setTimeout(() => tg.close(), 1500);
+                } else {
+                    throw new Error('Failed to sync');
+                }
             } catch (e) {
-                tg.showAlert("Error: " + e.message);
-                btn.innerText = "💾 SYNC & RANK"; btn.disabled = false;
+                console.error('Sync error:', e);
+                tg.showAlert("Sync failed. Please try again.");
+                btn.innerText = "💾 SYNC & RANK"; 
+                btn.disabled = false;
             }
         }
     </script>
