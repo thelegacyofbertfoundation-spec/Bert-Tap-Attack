@@ -4,8 +4,8 @@ import json
 import logging
 import time
 from collections import defaultdict
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonDefault
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 # Environment variables
 TOKEN = os.getenv('BOT_TOKEN')
@@ -95,12 +95,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command handler"""
     logger.info("START command received from user %s", update.effective_user.id)
     try:
-        await context.bot.set_chat_menu_button(
-            chat_id=update.effective_chat.id, 
-            menu_button=MenuButtonDefault()
-        )
-        
-        kb = [[KeyboardButton(text="🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
+        # Create inline button with WebApp
+        keyboard = [[InlineKeyboardButton("🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
         welcome_text = (
             "🎮 Welcome to Bert Tap Attack! 🎮\n\n"
@@ -111,10 +108,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/start - Show this message"
         )
         
-        await update.message.reply_text(
-            welcome_text,
-            reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
-        )
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
         logger.info("START response sent to user %s", update.effective_user.id)
     except Exception as e:
         logger.error("Start command error: %s", e)
