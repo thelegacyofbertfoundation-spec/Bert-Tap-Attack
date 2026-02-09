@@ -1,5 +1,5 @@
 import os
-import psycopg2
+import psycopg
 import json
 import logging
 import time
@@ -31,17 +31,16 @@ last_sync = defaultdict(float)
 def init_db():
     """Initialize database table"""
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS leaderboard (
-                id BIGINT PRIMARY KEY, 
-                name TEXT, 
-                score INTEGER
-            )
-        """)
-        conn.commit()
-        conn.close()
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as c:
+                c.execute("""
+                    CREATE TABLE IF NOT EXISTS leaderboard (
+                        id BIGINT PRIMARY KEY, 
+                        name TEXT, 
+                        score INTEGER
+                    )
+                """)
+                conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
@@ -49,15 +48,14 @@ def init_db():
 def update_db(uid, name, score):
     """Update user score in database"""
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        c = conn.cursor()
-        c.execute("""
-            INSERT INTO leaderboard (id, name, score) 
-            VALUES (%s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET name = %s, score = %s
-        """, (uid, str(name), int(score), str(name), int(score)))
-        conn.commit()
-        conn.close()
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as c:
+                c.execute("""
+                    INSERT INTO leaderboard (id, name, score) 
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET name = %s, score = %s
+                """, (uid, str(name), int(score), str(name), int(score)))
+                conn.commit()
         logger.info(f"Updated score for user {uid}: {score}")
     except Exception as e:
         logger.error(f"Database update error: {e}")
@@ -66,11 +64,10 @@ def update_db(uid, name, score):
 def get_rank():
     """Get top 10 leaderboard"""
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        c = conn.cursor()
-        c.execute("SELECT name, score FROM leaderboard ORDER BY score DESC LIMIT 10")
-        res = c.fetchall()
-        conn.close()
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as c:
+                c.execute("SELECT name, score FROM leaderboard ORDER BY score DESC LIMIT 10")
+                res = c.fetchall()
         
         if not res:
             return "🏆 No scores yet! Be the first!"
@@ -192,3 +189,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
+
+---
+
+## 🎯 **Quick Fix Steps**
+
+1. **Update `requirements.txt` to:**
+```
+python-telegram-bot==20.7
+psycopg[binary]==3.1.18
