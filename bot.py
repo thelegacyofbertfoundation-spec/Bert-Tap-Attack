@@ -10,13 +10,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Environment variables
 TOKEN = os.getenv('BOT_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-PORT = int(os.getenv('PORT', '10000'))
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable not set!")
-if not WEBHOOK_URL:
-    raise ValueError("WEBHOOK_URL environment variable not set!")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set!")
 
@@ -139,7 +135,6 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     now = time.time()
     
-    # Rate limiting - 5 second cooldown
     if now - last_sync[uid] < 5:
         await update.message.reply_text("⏳ Please wait 5 seconds before syncing again.")
         return
@@ -148,22 +143,19 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = json.loads(update.effective_message.web_app_data.data)
         score = data.get('score', 0)
         
-        # Anti-cheat validation
         if not isinstance(score, int) or score < 0:
             await update.message.reply_text("⚠️ Invalid score detected!")
             logger.warning("Invalid score from user %s: %s", uid, score)
             return
         
         if score > 10000000:
-            await update.message.reply_text("⚠️ Score too high! Possible cheating detected.")
+            await update.message.reply_text("⚠️ Score too high! Possible cheating detected!")
             logger.warning("Suspiciously high score from user %s: %s", uid, score)
             return
         
-        # Update database
         update_db(uid, update.effective_user.first_name, score)
         last_sync[uid] = now
         
-        # Send success message with leaderboard
         await update.message.reply_text("✅ Score Synced Successfully!\n\n" + get_rank())
         logger.info("Successfully synced score for user %s: %s", uid, score)
         
@@ -177,38 +169,19 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Main function to run the bot"""
     logger.info("=" * 50)
-    logger.info("Starting Bert Tap Attack Bot")
-    logger.info("Port: %s", PORT)
-    logger.info("Webhook URL: %s", WEBHOOK_URL)
+    logger.info("Starting Bert Tap Attack Bot (POLLING MODE)")
     logger.info("=" * 50)
     
-    # Initialize database
     init_db()
     
-    # Build application
     app = Application.builder().token(TOKEN).build()
     
-    # Add handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_data))
     
-    # Full webhook URL
-    webhook_url_full = WEBHOOK_URL + "/" + TOKEN
-    
-    logger.info("Starting webhook server...")
-    logger.info("Listening on: 0.0.0.0:%s", PORT)
-    logger.info("Webhook path: /%s", TOKEN)
-    logger.info("Full webhook URL: %s", webhook_url_full)
-    
-    # Run webhook - the library handles everything internally
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=TOKEN,
-        webhook_url=webhook_url_full,
-        allowed_updates=Update.ALL_TYPES
-    )
+    logger.info("Bot starting in polling mode...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()
