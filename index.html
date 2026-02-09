@@ -14,9 +14,8 @@
         #face:active { transform: scale(0.95); }
         #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
-        .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
-        #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
     </style>
 </head>
 <body>
@@ -31,15 +30,15 @@
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
-        <button class="btn" style="background:#2980b9; margin-bottom: 5px;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Shop</button>
+        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Shop</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
 
-    <div id="shop-modal">
+    <div id="shop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); flex-direction:column; justify-content:center; align-items:center; z-index:100;">
         <h2>Gym Upgrades</h2>
         <p>Power: <span id="pwr-val">1</span></p>
         <button class="btn" id="up-btn" onclick="buyUpgrade()">Upgrade (Cost: 100)</button>
-        <button class="btn" style="background:#444; margin-top:20px;" onclick="document.getElementById('shop-modal').style.display='none'">Back</button>
+        <button class="btn" style="background:#444; margin-top:20px;" onclick="document.getElementById('shop-modal').style.display='none'">Close</button>
     </div>
 
     <script>
@@ -87,17 +86,19 @@
             btn.innerText = "Syncing...";
             btn.disabled = true;
 
-            // 1. SAVE TO CLOUD (Background)
-            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
-
-            // 2. SEND TO BOT (Immediately)
+            // --- THE FORCE-FIRST SYNC ---
             try {
+                // 1. Send the score to the bot IMMEDIATELY
                 tg.sendData(JSON.stringify({ "score": score }));
                 
-                // 3. FORCE CLOSE (No matter what)
+                // 2. Start the Cloud Save in the background (don't wait for it)
+                tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
+
+                // 3. Force the app to close after a short delay
                 setTimeout(() => { tg.close(); }, 800); 
+
             } catch (e) {
-                tg.showAlert("Error! Please launch via the big Chat Button.");
+                tg.showAlert("Launch via the BIG Chat Button!");
                 btn.innerText = "💾 Sync & Rank";
                 btn.disabled = false;
             }
