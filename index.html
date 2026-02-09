@@ -203,7 +203,6 @@
         let totalTaps = 0;
         let isLoading = true;
         
-        // Load data from Telegram Cloud Storage
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
             if (!err && values) {
                 score = parseInt(values.score) || 0;
@@ -215,7 +214,6 @@
             document.getElementById('loading').classList.add('hidden');
         });
         
-        // Update UI elements
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
             document.getElementById('e-val').innerText = Math.floor(energy);
@@ -223,7 +221,6 @@
             document.getElementById('tap-counter').innerText = `Total Taps: ${totalTaps.toLocaleString()}`;
         }
         
-        // Energy regeneration (1 per second)
         setInterval(() => { 
             if (energy < 100) { 
                 energy = Math.min(100, energy + 1);
@@ -231,14 +228,12 @@
             } 
         }, 1000);
         
-        // Auto-save every 30 seconds
         setInterval(() => {
             if (!isLoading) {
                 saveToCloud();
             }
         }, 30000);
         
-        // Save to Telegram Cloud Storage
         function saveToCloud(callback) {
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
@@ -246,18 +241,14 @@
             if (callback) callback();
         }
         
-        // Handle tap on face
         document.getElementById('face').addEventListener('click', function(e) {
             if (energy >= 1) {
-                // Update game state
                 score += tapPower;
                 energy -= 1;
                 totalTaps += 1;
                 
-                // Haptic feedback
                 tg.HapticFeedback.impactOccurred('medium');
                 
-                // Create floating +score effect
                 const effect = document.createElement('div');
                 effect.className = 'tap-effect';
                 effect.innerText = `+${tapPower}`;
@@ -265,18 +256,14 @@
                 effect.style.top = e.clientY + 'px';
                 document.getElementById('game-area').appendChild(effect);
                 
-                // Remove effect after animation
                 setTimeout(() => effect.remove(), 1000);
                 
-                // Update UI
                 updateUI();
             } else {
-                // Out of energy feedback
                 tg.HapticFeedback.notificationOccurred('error');
             }
         });
         
-        // Sync and rank function
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
             
@@ -285,7 +272,6 @@
             btn.innerText = "⏳ SAVING...";
             btn.disabled = true;
             
-            // Save to cloud storage first
             tg.CloudStorage.setItems({
                 'score': String(score), 
                 'tapPower': String(tapPower),
@@ -294,14 +280,12 @@
                 if (success) {
                     btn.innerText = "🚀 RANKING...";
                     
-                    // Send data to bot
                     try {
                         tg.sendData(JSON.stringify({ 
                             score: score,
                             totalTaps: totalTaps
                         }));
                         
-                        // Close web app after short delay
                         setTimeout(() => { 
                             tg.close(); 
                         }, 700);
@@ -319,85 +303,13 @@
             });
         }
         
-        // Save before closing
         window.addEventListener('beforeunload', () => {
             saveToCloud();
         });
         
-        // Prevent accidental zoom
         document.addEventListener('gesturestart', function(e) {
             e.preventDefault();
         });
     </script>
 </body>
 </html>
-```
-
----
-
-## 📄 **requirements.txt** (Full File)
-```
-python-telegram-bot==20.7
-psycopg2-binary==2.9.9
-```
-
----
-
-## 📄 **.gitignore** (Full File)
-```
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment variables
-.env
-.env.local
-
-# Logs
-*.log
-```
-
----
-
-## 🚀 **DEPLOYMENT STEPS**
-
-### 1. **Set up Render**
-1. Go to Render.com dashboard
-2. Create new PostgreSQL database
-   - Name: `bert-tap-db`
-   - Copy the **Internal Database URL**
-
-3. Create new Web Service
-   - Connect your GitHub repo
-   - Name: `bert-tap-bot`
-   - Environment: `Python 3`
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python bot.py`
-
-### 2. **Add Environment Variables in Render**
-```
-BOT_TOKEN = your_telegram_bot_token_here
-DATABASE_URL = (paste the PostgreSQL Internal Database URL)
-WEBHOOK_URL = https://bert-tap-bot.onrender.com
