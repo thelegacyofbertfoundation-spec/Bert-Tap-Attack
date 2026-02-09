@@ -199,20 +199,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
-
----
-
-## 🔧 **Key Changes:**
-
-1. **Replaced all f-strings** with string concatenation and `.format()` for Python 3.6+ compatibility
-2. **Fixed line 192** - changed `webhook_url=f"{WEBHOOK_URL}/{TOKEN}"` to use string concatenation
-3. **Replaced all f-string logging** with `%s` formatting
-
----
-
-## 📄 **Also add runtime.txt to force Python 3.11:**
-
-Create a file called `runtime.txt` in your repo root:
-```
-python-3.11.0
