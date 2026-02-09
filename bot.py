@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from collections import defaultdict
+from aiohttp import web
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonDefault
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -11,9 +12,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = os.getenv('BOT_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-
-# CRITICAL: Render provides PORT dynamically
-PORT = int(os.environ.get('PORT', 10000))
+PORT = int(os.getenv('PORT', '10000'))
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable not set!")
@@ -174,6 +173,10 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error("Error handling web app data: %s", e)
         await update.message.reply_text("❌ Sync failed. Please try again.")
 
+async def health_check(request):
+    """Health check endpoint for Render"""
+    return web.Response(text="OK")
+
 def main():
     """Main function to run the bot"""
     logger.info("=" * 50)
@@ -201,12 +204,18 @@ def main():
     logger.info("Webhook path: /%s", TOKEN)
     logger.info("Full webhook URL: %s", webhook_url_full)
     
-    # Run webhook for Render deployment
+    # Create web app for health check
+    webserver = web.Application()
+    webserver.router.add_get('/', health_check)
+    webserver.router.add_get('/health', health_check)
+    
+    # Run webhook with custom web app
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path=TOKEN,
-        webhook_url=webhook_url_full
+        webhook_url=webhook_url_full,
+        web_app=webserver
     )
 
 if __name__ == '__main__':
