@@ -15,7 +15,7 @@
         #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; }
         #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
         .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1rem; cursor: pointer; }
+        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
     </style>
 </head>
 <body>
@@ -35,7 +35,7 @@
     </div>
 
     <div id="shop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); flex-direction:column; justify-content:center; align-items:center; z-index:100;">
-        <h2>Fighter's Gym</h2>
+        <h2>Gym Upgrades</h2>
         <p>Power: <span id="pwr-val">1</span></p>
         <button class="btn" id="up-btn" onclick="buyUpgrade()">Upgrade (Cost: 100)</button>
         <button class="btn" style="background:#444; margin-top:20px;" onclick="document.getElementById('shop-modal').style.display='none'">Back</button>
@@ -78,36 +78,29 @@
             if (score >= cost) {
                 score -= cost; tapPower += 1;
                 updateUI();
-            } else { tg.showAlert("Need more coins!"); }
-        }
-
-        function finalize() {
-            try {
-                tg.sendData(JSON.stringify({ "score": score }));
-                setTimeout(() => { tg.close(); }, 500);
-            } catch (e) {
-                tg.close();
             }
         }
 
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
-            btn.innerText = "💾 Saving...";
+            btn.innerText = "💾 SAVING...";
             btn.disabled = true;
 
-            // 1. Set an EMERGENCY EJECT timer (2 seconds)
-            const safetyTimer = setTimeout(() => {
-                console.log("Cloud Timeout - Proceeding to Rank");
-                finalize();
-            }, 2000);
-
-            // 2. Attempt the cloud save
+            // 1. Force Cloud Save first
             tg.CloudStorage.setItems({
                 'score': String(score),
                 'tapPower': String(tapPower)
             }, (err, success) => {
-                clearTimeout(safetyTimer); // Cancel timer if cloud responds
-                finalize();
+                // 2. Pulse: Wait 500ms before sending to Bot to let the Cloud finish
+                setTimeout(() => {
+                    try {
+                        tg.sendData(JSON.stringify({ "score": score }));
+                        // 3. Final Eject
+                        setTimeout(() => { tg.close(); }, 500);
+                    } catch (e) {
+                        tg.close();
+                    }
+                }, 500);
             });
         }
     </script>
