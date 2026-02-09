@@ -124,7 +124,14 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle score sync from web app"""
-    logger.info("Data received from web app")
+    logger.info("=" * 50)
+    logger.info("WEBAPP DATA RECEIVED!")
+    logger.info("User ID: %s", update.effective_user.id)
+    logger.info("Update type: %s", type(update))
+    logger.info("Has web_app_data: %s", hasattr(update.effective_message, 'web_app_data'))
+    if hasattr(update.effective_message, 'web_app_data'):
+        logger.info("Raw data: %s", update.effective_message.web_app_data.data)
+    logger.info("=" * 50)
     
     uid = update.effective_user.id
     now = time.time()
