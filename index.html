@@ -6,82 +6,398 @@
     <title>Bert Tap Attack</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-        #coin-icon { width: 120px; height: 120px; margin-top: 20px; }
-        #score { font-size: 3.5rem; font-weight: bold; }
-        #face { width: 100vw; max-width: 600px; cursor: pointer; transition: transform 0.05s; }
-        #face:active { transform: scale(0.95); }
-        #energy-container { width: 85%; background: #333; height: 12px; border-radius: 10px; overflow: hidden; margin: 0 auto; }
-        #energy-bar { width: 100%; height: 100%; background: #f1c40f; transition: width 0.2s; }
-        .footer { padding-bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn { background: #d35400; color: white; border: none; padding: 15px; border-radius: 25px; font-weight: bold; width: 85%; font-size: 1.1rem; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #fff; 
+            font-family: 'Arial', sans-serif; 
+            text-align: center; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        
+        #header {
+            padding-top: 20px;
+        }
+        
+        #coin-icon { 
+            width: 80px; 
+            height: 80px; 
+            margin-bottom: 10px;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        #score { 
+            font-size: 3.5rem; 
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(241, 196, 15, 0.5);
+            margin: 10px 0;
+        }
+        
+        #tap-counter {
+            font-size: 0.9rem;
+            color: #f1c40f;
+            margin-top: 5px;
+        }
+        
+        #game-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        #face { 
+            width: 85vw;
+            max-width: 400px;
+            cursor: pointer; 
+            transition: transform 0.1s;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        #face:active { 
+            transform: scale(0.92); 
+        }
+        
+        .tap-effect {
+            position: absolute;
+            color: #f1c40f;
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.8);
+        }
+        
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-100px); }
+        }
+        
+        .footer { 
+            padding: 20px 20px 30px 20px;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        #energy-label {
+            font-size: 0.85rem;
+            color: #bbb;
+            margin-bottom: 5px;
+        }
+        
+        #energy-container { 
+            width: 90%; 
+            max-width: 400px;
+            background: #333; 
+            height: 14px; 
+            border-radius: 10px; 
+            overflow: hidden;
+            border: 2px solid #444;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #energy-bar { 
+            width: 100%; 
+            height: 100%; 
+            background: linear-gradient(90deg, #f39c12 0%, #f1c40f 100%);
+            transition: width 0.2s;
+            box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        }
+        
+        .btn { 
+            background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+            color: white; 
+            border: none; 
+            padding: 16px 30px;
+            border-radius: 30px; 
+            font-weight: bold; 
+            width: 90%; 
+            max-width: 400px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(211, 84, 0, 0.4);
+            transition: all 0.3s;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(211, 84, 0, 0.6);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-size: 1.5rem;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <div id="header">
-        <img src="coin.png" id="coin-icon">
-        <div id="score">0</div>
+    <div id="loading">
+        <div>Loading...</div>
     </div>
-    <img id="face" src="face.png">
+    
+    <div id="header">
+        <img src="coin.png" id="coin-icon" alt="Coin">
+        <div id="score">0</div>
+        <div id="tap-counter">Total Taps: 0</div>
+    </div>
+    
+    <div id="game-area">
+        <img id="face" src="face.png" alt="Bert's Face">
+    </div>
+    
     <div class="footer">
-        <div style="font-size: 0.8rem; margin-bottom: 5px;">Energy: <span id="e-val">100</span>/100</div>
-        <div id="energy-container"><div id="energy-bar"></div></div>
+        <div id="energy-label">Energy: <span id="e-val">100</span>/100</div>
+        <div id="energy-container">
+            <div id="energy-bar"></div>
+        </div>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 SYNC & RANK</button>
     </div>
-
+    
     <script>
         const tg = window.Telegram.WebApp;
-        tg.ready(); tg.expand();
-
-        let score = 0, tapPower = 1, energy = 100;
-
-        tg.CloudStorage.getItems(['score', 'tapPower'], (err, values) => {
-            if (!err) {
+        tg.ready();
+        tg.expand();
+        
+        let score = 0;
+        let tapPower = 1;
+        let energy = 100;
+        let totalTaps = 0;
+        let isLoading = true;
+        
+        // Load data from Telegram Cloud Storage
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
+            if (!err && values) {
                 score = parseInt(values.score) || 0;
                 tapPower = parseInt(values.tapPower) || 1;
+                totalTaps = parseInt(values.totalTaps) || 0;
             }
             updateUI();
+            isLoading = false;
+            document.getElementById('loading').classList.add('hidden');
         });
-
+        
+        // Update UI elements
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
             document.getElementById('e-val').innerText = Math.floor(energy);
             document.getElementById('energy-bar').style.width = energy + "%";
+            document.getElementById('tap-counter').innerText = `Total Taps: ${totalTaps.toLocaleString()}`;
         }
-
-        setInterval(() => { if(energy < 100) { energy += 1; updateUI(); } }, 1000);
-
-        document.getElementById('face').onclick = () => {
-            if (energy >= 1) {
-                score += tapPower; energy -= 1;
-                tg.HapticFeedback.impactOccurred('medium');
-                updateUI();
+        
+        // Energy regeneration (1 per second)
+        setInterval(() => { 
+            if (energy < 100) { 
+                energy = Math.min(100, energy + 1);
+                updateUI(); 
+            } 
+        }, 1000);
+        
+        // Auto-save every 30 seconds
+        setInterval(() => {
+            if (!isLoading) {
+                saveToCloud();
             }
-        };
-
+        }, 30000);
+        
+        // Save to Telegram Cloud Storage
+        function saveToCloud(callback) {
+            tg.CloudStorage.setItem('score', String(score));
+            tg.CloudStorage.setItem('tapPower', String(tapPower));
+            tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+            if (callback) callback();
+        }
+        
+        // Handle tap on face
+        document.getElementById('face').addEventListener('click', function(e) {
+            if (energy >= 1) {
+                // Update game state
+                score += tapPower;
+                energy -= 1;
+                totalTaps += 1;
+                
+                // Haptic feedback
+                tg.HapticFeedback.impactOccurred('medium');
+                
+                // Create floating +score effect
+                const effect = document.createElement('div');
+                effect.className = 'tap-effect';
+                effect.innerText = `+${tapPower}`;
+                effect.style.left = e.clientX + 'px';
+                effect.style.top = e.clientY + 'px';
+                document.getElementById('game-area').appendChild(effect);
+                
+                // Remove effect after animation
+                setTimeout(() => effect.remove(), 1000);
+                
+                // Update UI
+                updateUI();
+            } else {
+                // Out of energy feedback
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+        });
+        
+        // Sync and rank function
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
+            
+            if (isLoading || btn.disabled) return;
+            
             btn.innerText = "⏳ SAVING...";
             btn.disabled = true;
-
-            // 1. BLOCKING SAVE: Wait for Cloud success
-            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
+            
+            // Save to cloud storage first
+            tg.CloudStorage.setItems({
+                'score': String(score), 
+                'tapPower': String(tapPower),
+                'totalTaps': String(totalTaps)
+            }, (err, success) => {
                 if (success) {
                     btn.innerText = "🚀 RANKING...";
-                    // 2. Only now send to bot
+                    
+                    // Send data to bot
                     try {
-                        tg.sendData(JSON.stringify({ "score": score }));
-                        setTimeout(() => { tg.close(); }, 700);
+                        tg.sendData(JSON.stringify({ 
+                            score: score,
+                            totalTaps: totalTaps
+                        }));
+                        
+                        // Close web app after short delay
+                        setTimeout(() => { 
+                            tg.close(); 
+                        }, 700);
                     } catch (e) {
-                        tg.close();
+                        console.error('Error sending data:', e);
+                        tg.showAlert("Failed to sync. Please try again.");
+                        btn.innerText = "💾 SYNC & RANK";
+                        btn.disabled = false;
                     }
                 } else {
-                    tg.showAlert("Cloud busy. Try once more.");
+                    tg.showAlert("Cloud storage busy. Please try again.");
                     btn.innerText = "💾 SYNC & RANK";
                     btn.disabled = false;
                 }
             });
         }
+        
+        // Save before closing
+        window.addEventListener('beforeunload', () => {
+            saveToCloud();
+        });
+        
+        // Prevent accidental zoom
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
     </script>
 </body>
 </html>
+```
+
+---
+
+## 📄 **requirements.txt** (Full File)
+```
+python-telegram-bot==20.7
+psycopg2-binary==2.9.9
+```
+
+---
+
+## 📄 **.gitignore** (Full File)
+```
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+```
+
+---
+
+## 🚀 **DEPLOYMENT STEPS**
+
+### 1. **Set up Render**
+1. Go to Render.com dashboard
+2. Create new PostgreSQL database
+   - Name: `bert-tap-db`
+   - Copy the **Internal Database URL**
+
+3. Create new Web Service
+   - Connect your GitHub repo
+   - Name: `bert-tap-bot`
+   - Environment: `Python 3`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `python bot.py`
+
+### 2. **Add Environment Variables in Render**
+```
+BOT_TOKEN = your_telegram_bot_token_here
+DATABASE_URL = (paste the PostgreSQL Internal Database URL)
+WEBHOOK_URL = https://bert-tap-bot.onrender.com
