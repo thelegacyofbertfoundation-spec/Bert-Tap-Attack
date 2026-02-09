@@ -35,7 +35,7 @@ def get_leaderboard_text():
         c.execute("SELECT username, score FROM leaderboard ORDER BY score DESC LIMIT 10")
         players = c.fetchall()
         conn.close()
-        if not players: return "🏆 Leaderboard 🏆\n\nNo scores yet! Progress is reset on Bot restarts."
+        if not players: return "🏆 Leaderboard 🏆\n\nNo scores yet! Progress resets on Bot restarts."
         text = "🏆 Global Leaderboard 🏆\n\n"
         for i, (name, s) in enumerate(players, 1):
             text += f"{i}. {name}: {s:,} 💰\n"
@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.set_chat_menu_button(chat_id=update.effective_chat.id, menu_button=MenuButtonDefault())
     keyboard = [[KeyboardButton(text="🥊 Launch Bert Tap Attack", web_app=WebAppInfo(url=GITHUB_URL))]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(f"Hey {user.first_name}! 🥊\nV4.5-FINAL is live.", reply_markup=reply_markup)
+    await update.message.reply_text(f"Hey {user.first_name}! 🥊\nV4.6 Ready.", reply_markup=reply_markup)
 
 async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_leaderboard_text())
