@@ -106,6 +106,29 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.info("📊 /leaderboard from user %s", update.effective_user.id)
     await update.message.reply_text(get_rank())
 
+async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Debug command to check database"""
+    logger.info("🔧 /debug from user %s", update.effective_user.id)
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("SELECT id, name, score FROM leaderboard ORDER BY score DESC")
+        res = c.fetchall()
+        c.close()
+        conn.close()
+        
+        if not res:
+            await update.message.reply_text("❌ Database is empty!")
+        else:
+            msg = f"📊 Database Contents ({len(res)} entries):\n\n"
+            for row in res:
+                msg += f"ID: {row[0]}\nName: {row[1]}\nScore: {row[2]:,}\n\n"
+            await update.message.reply_text(msg)
+            logger.info("Database has %s entries", len(res))
+    except Exception as e:
+        logger.error("Debug error: %s", e)
+        await update.message.reply_text(f"❌ Error: {e}")
+
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("=" * 60)
     logger.info("🎯 WEBAPP DATA RECEIVED!")
@@ -142,6 +165,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
+    app.add_handler(CommandHandler("debug", debug_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     
     webhook_url = WEBHOOK_URL + "/" + TOKEN
