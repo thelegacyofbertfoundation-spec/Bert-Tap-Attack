@@ -31,43 +31,49 @@ last_sync = defaultdict(float)
 def init_db():
     """Initialize database table"""
     try:
-        with psycopg.connect(DATABASE_URL) as conn:
-            with conn.cursor() as c:
-                c.execute("""
-                    CREATE TABLE IF NOT EXISTS leaderboard (
-                        id BIGINT PRIMARY KEY, 
-                        name TEXT, 
-                        score INTEGER
-                    )
-                """)
-                conn.commit()
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS leaderboard (
+                id BIGINT PRIMARY KEY, 
+                name TEXT, 
+                score INTEGER
+            )
+        """)
+        conn.commit()
+        c.close()
+        conn.close()
         logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"Database initialization error: {e}")
+        logger.error("Database initialization error: %s", e)
 
 def update_db(uid, name, score):
     """Update user score in database"""
     try:
-        with psycopg.connect(DATABASE_URL) as conn:
-            with conn.cursor() as c:
-                c.execute("""
-                    INSERT INTO leaderboard (id, name, score) 
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (id) DO UPDATE SET name = %s, score = %s
-                """, (uid, str(name), int(score), str(name), int(score)))
-                conn.commit()
-        logger.info(f"Updated score for user {uid}: {score}")
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO leaderboard (id, name, score) 
+            VALUES (%s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET name = %s, score = %s
+        """, (uid, str(name), int(score), str(name), int(score)))
+        conn.commit()
+        c.close()
+        conn.close()
+        logger.info("Updated score for user %s: %s", uid, score)
     except Exception as e:
-        logger.error(f"Database update error: {e}")
+        logger.error("Database update error: %s", e)
         raise
 
 def get_rank():
     """Get top 10 leaderboard"""
     try:
-        with psycopg.connect(DATABASE_URL) as conn:
-            with conn.cursor() as c:
-                c.execute("SELECT name, score FROM leaderboard ORDER BY score DESC LIMIT 10")
-                res = c.fetchall()
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("SELECT name, score FROM leaderboard ORDER BY score DESC LIMIT 10")
+        res = c.fetchall()
+        c.close()
+        conn.close()
         
         if not res:
             return "🏆 No scores yet! Be the first!"
@@ -75,13 +81,15 @@ def get_rank():
         leaderboard_text = "🏆 Global Leaderboard 🏆\n\n"
         medals = ["🥇", "🥈", "🥉"]
         
-        for i, (name, score) in enumerate(res):
-            medal = medals[i] if i < 3 else f"{i+1}."
-            leaderboard_text += f"{medal} {name}: {score:,}\n"
+        for i, row in enumerate(res):
+            name = row[0]
+            score = row[1]
+            medal = medals[i] if i < 3 else str(i+1) + "."
+            leaderboard_text += medal + " " + name + ": " + "{:,}".format(score) + "\n"
         
         return leaderboard_text
     except Exception as e:
-        logger.error(f"Leaderboard fetch error: {e}")
+        logger.error("Leaderboard fetch error: %s", e)
         return "❌ Error loading leaderboard"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,16 +115,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome_text,
             reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
         )
-        logger.info(f"User {update.effective_user.id} started the bot")
+        logger.info("User %s started the bot", update.effective_user.id)
     except Exception as e:
-        logger.error(f"Start command error: {e}")
+        logger.error("Start command error: %s", e)
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Leaderboard command handler"""
     try:
         await update.message.reply_text(get_rank())
     except Exception as e:
-        logger.error(f"Leaderboard command error: {e}")
+        logger.error("Leaderboard command error: %s", e)
         await update.message.reply_text("❌ Error loading leaderboard")
 
 async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,12 +146,12 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Anti-cheat validation
         if not isinstance(score, int) or score < 0:
             await update.message.reply_text("⚠️ Invalid score detected!")
-            logger.warning(f"Invalid score from user {uid}: {score}")
+            logger.warning("Invalid score from user %s: %s", uid, score)
             return
         
-        if score > 10000000:  # Adjust this limit based on your game
+        if score > 10000000:
             await update.message.reply_text("⚠️ Score too high! Possible cheating detected.")
-            logger.warning(f"Suspiciously high score from user {uid}: {score}")
+            logger.warning("Suspiciously high score from user %s: %s", uid, score)
             return
         
         # Update database
@@ -151,14 +159,14 @@ async def handle_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_sync[uid] = now
         
         # Send success message with leaderboard
-        await update.message.reply_text(f"✅ Score Synced Successfully!\n\n{get_rank()}")
-        logger.info(f"Successfully synced score for user {uid}: {score}")
+        await update.message.reply_text("✅ Score Synced Successfully!\n\n" + get_rank())
+        logger.info("Successfully synced score for user %s: %s", uid, score)
         
     except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error: {e}")
+        logger.error("JSON decode error: %s", e)
         await update.message.reply_text("❌ Invalid data format. Please try again.")
     except Exception as e:
-        logger.error(f"Error handling web app data: {e}")
+        logger.error("Error handling web app data: %s", e)
         await update.message.reply_text("❌ Sync failed. Please try again.")
 
 def main():
@@ -176,14 +184,16 @@ def main():
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_data))
     
-    logger.info(f"Starting webhook on port {PORT}")
-    logger.info(f"Webhook URL: {WEBHOOK_URL}/{TOKEN}")
+    logger.info("Starting webhook on port %s", PORT)
+    logger.info("Webhook URL: %s/%s", WEBHOOK_URL, TOKEN)
     
     # Run webhook for Render deployment
+    webhook_url_full = WEBHOOK_URL + "/" + TOKEN
+    
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
+        webhook_url=webhook_url_full,
         url_path=TOKEN
     )
 
@@ -193,9 +203,16 @@ if __name__ == '__main__':
 
 ---
 
-## 🎯 **Quick Fix Steps**
+## 🔧 **Key Changes:**
 
-1. **Update `requirements.txt` to:**
+1. **Replaced all f-strings** with string concatenation and `.format()` for Python 3.6+ compatibility
+2. **Fixed line 192** - changed `webhook_url=f"{WEBHOOK_URL}/{TOKEN}"` to use string concatenation
+3. **Replaced all f-string logging** with `%s` formatting
+
+---
+
+## 📄 **Also add runtime.txt to force Python 3.11:**
+
+Create a file called `runtime.txt` in your repo root:
 ```
-python-telegram-bot==20.7
-psycopg[binary]==3.1.18
+python-3.11.0
