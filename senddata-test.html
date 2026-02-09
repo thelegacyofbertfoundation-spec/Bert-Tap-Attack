@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SendData Test</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 30px 50px;
+            font-size: 24px;
+            border-radius: 15px;
+            margin: 20px;
+            cursor: pointer;
+        }
+        #status {
+            background: #333;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background: #444;
+            border-radius: 5px;
+        }
+        .success { color: #2ecc71; }
+        .error { color: #e74c3c; }
+        .info { color: #3498db; }
+    </style>
+</head>
+<body>
+    <h1>🧪 SendData Test</h1>
+    <p>Click the button to test sending data to the bot</p>
+    
+    <button onclick="testSend()">SEND TEST DATA</button>
+    
+    <div id="status">
+        <div class="step info">Waiting for test...</div>
+    </div>
+    
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        
+        function addStatus(msg, type = 'info') {
+            const status = document.getElementById('status');
+            const step = document.createElement('div');
+            step.className = 'step ' + type;
+            step.innerText = new Date().toLocaleTimeString() + ' - ' + msg;
+            status.appendChild(step);
+        }
+        
+        addStatus('WebApp initialized', 'success');
+        addStatus('Platform: ' + tg.platform, 'info');
+        addStatus('Version: ' + tg.version, 'info');
+        
+        if (!tg.initData) {
+            addStatus('⚠️ WARNING: No initData (might not work)', 'error');
+        } else {
+            addStatus('✓ initData present', 'success');
+        }
+        
+        function testSend() {
+            addStatus('Starting test...', 'info');
+            
+            const testData = {
+                score: 999,
+                totalTaps: 100,
+                test: true
+            };
+            
+            addStatus('Data prepared: ' + JSON.stringify(testData), 'info');
+            
+            try {
+                addStatus('Calling tg.sendData()...', 'info');
+                tg.sendData(JSON.stringify(testData));
+                addStatus('✓ sendData() called successfully!', 'success');
+                addStatus('Waiting 2 seconds...', 'info');
+                
+                setTimeout(() => {
+                    addStatus('Attempting to close WebApp...', 'info');
+                    try {
+                        tg.close();
+                        addStatus('✓ close() called', 'success');
+                    } catch (e) {
+                        addStatus('❌ Close failed: ' + e.message, 'error');
+                    }
+                }, 2000);
+                
+            } catch (e) {
+                addStatus('❌ ERROR: ' + e.message, 'error');
+                addStatus('Stack: ' + e.stack, 'error');
+                tg.showAlert('Error: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
