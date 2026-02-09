@@ -31,8 +31,8 @@
     <div class="footer">
         <div style="font-size: 0.8rem;">Energy: <span id="e-val">100</span>/100</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
-        <button class="btn" style="background:#2980b9;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Upgrades</button>
-        <button class="btn" onclick="syncAndRank()">💾 Sync & Rank</button>
+        <button class="btn" style="background:#2980b9; margin-bottom: 5px;" onclick="document.getElementById('shop-modal').style.display='flex'">🛒 Shop</button>
+        <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 Sync & Rank</button>
     </div>
 
     <div id="shop-modal">
@@ -79,18 +79,28 @@
             if (score >= cost) {
                 score -= cost; tapPower += 1;
                 updateUI();
-            } else { tg.showAlert("Not enough coins!"); }
+            } else { tg.showAlert("Need more coins!"); }
         }
 
         function syncAndRank() {
-            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)}, (err, success) => {
-                try {
-                    tg.sendData(JSON.stringify({ "score": score }));
-                    setTimeout(() => { tg.close(); }, 800); 
-                } catch (e) {
-                    tg.showAlert("Launch via the CHAT BUTTON!");
-                }
-            });
+            const btn = document.getElementById('sync-btn');
+            btn.innerText = "Syncing...";
+            btn.disabled = true;
+
+            // 1. SAVE TO CLOUD (Background)
+            tg.CloudStorage.setItems({'score': String(score), 'tapPower': String(tapPower)});
+
+            // 2. SEND TO BOT (Immediately)
+            try {
+                tg.sendData(JSON.stringify({ "score": score }));
+                
+                // 3. FORCE CLOSE (No matter what)
+                setTimeout(() => { tg.close(); }, 800); 
+            } catch (e) {
+                tg.showAlert("Error! Please launch via the big Chat Button.");
+                btn.innerText = "💾 Sync & Rank";
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
