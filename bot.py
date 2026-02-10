@@ -39,6 +39,14 @@ def init_db():
                 score INTEGER
             )
         """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS referrals (
+                user_id BIGINT PRIMARY KEY,
+                referred_by BIGINT,
+                energy_boosts INTEGER DEFAULT 0,
+                total_referrals INTEGER DEFAULT 0
+            )
+        """)
         conn.commit()
         c.close()
         conn.close()
@@ -89,6 +97,45 @@ def get_rank():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("📩 /start from user %s", update.effective_user.id)
+    user_id = update.effective_user.id
+    
+    # Check for referral code
+    if context.args and len(context.args) > 0:
+        ref_code = context.args[0]
+        if ref_code.startswith('ref_'):
+            try:
+                referrer_id = int(ref_code.replace('ref_', ''))
+                if referrer_id != user_id:  # Can't refer yourself
+                    # Check if user is new (not already in referrals table)
+                    conn = psycopg.connect(DATABASE_URL)
+                    c = conn.cursor()
+                    c.execute("SELECT user_id FROM referrals WHERE user_id = %s", (user_id,))
+                    existing = c.fetchone()
+                    
+                    if not existing:
+                        # New user - track referral
+                        c.execute("""
+                            INSERT INTO referrals (user_id, referred_by, energy_boosts) 
+                            VALUES (%s, %s, 0)
+                        """, (user_id, referrer_id))
+                        
+                        # Give referrer a reward
+                        c.execute("""
+                            INSERT INTO referrals (user_id, energy_boosts, total_referrals)
+                            VALUES (%s, 1, 1)
+                            ON CONFLICT (user_id) DO UPDATE 
+                            SET energy_boosts = referrals.energy_boosts + 1,
+                                total_referrals = referrals.total_referrals + 1
+                        """, (referrer_id,))
+                        
+                        conn.commit()
+                        logger.info("✅ Referral tracked: %s referred by %s", user_id, referrer_id)
+                    
+                    c.close()
+                    conn.close()
+            except Exception as e:
+                logger.error("Referral error: %s", e)
+    
     try:
         keyboard = [[KeyboardButton(text="🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -99,7 +146,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Use the *☰ Menu button* (bottom-left) → Play Game\n\n"
             "*Commands:*\n"
             "/leaderboard - View top players\n"
-            "/debug - Check your score",
+            "/invite - Get your referral link\n"
+            "/boosts - Check your energy boosts",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -109,6 +157,57 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("📊 /leaderboard from user %s", update.effective_user.id)
     await update.message.reply_text(get_rank())
+
+async def invite_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("🎁 /invite from user %s", update.effective_user.id)
+    user_id = update.effective_user.id
+    bot_username = "BertTapBot"  # Replace with your actual bot username
+    invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("SELECT total_referrals FROM referrals WHERE user_id = %s", (user_id,))
+        result = c.fetchone()
+        total_refs = result[0] if result else 0
+        c.close()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"🎁 *Invite Friends & Earn Rewards!*\n\n"
+            f"Share your link:\n`{invite_link}`\n\n"
+            f"🎯 *Rewards per friend:*\n"
+            f"• 60-minute Energy Refill Boost\n\n"
+            f"👥 *Your Stats:*\n"
+            f"Friends invited: {total_refs}\n\n"
+            f"💡 Tap the link above to copy it!",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error("Invite error: %s", e)
+
+async def boosts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("⚡ /boosts from user %s", update.effective_user.id)
+    user_id = update.effective_user.id
+    
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("SELECT energy_boosts FROM referrals WHERE user_id = %s", (user_id,))
+        result = c.fetchone()
+        boosts = result[0] if result else 0
+        c.close()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"⚡ *Your Energy Boosts*\n\n"
+            f"Available: {boosts} boost(s)\n\n"
+            f"Each boost gives you a full energy refill in the game!\n\n"
+            f"Use them in the game by clicking the ⚡ REFILL button.",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error("Boosts error: %s", e)
 
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("🔧 /debug from user %s", update.effective_user.id)
@@ -139,6 +238,49 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         data = json.loads(update.effective_message.web_app_data.data)
+        action = data.get('action', 'sync')
+        
+        if action == 'get_boosts':
+            # Send energy boosts to game
+            user_id = update.effective_user.id
+            conn = psycopg.connect(DATABASE_URL)
+            c = conn.cursor()
+            c.execute("SELECT energy_boosts FROM referrals WHERE user_id = %s", (user_id,))
+            result = c.fetchone()
+            boosts = result[0] if result else 0
+            c.close()
+            conn.close()
+            
+            await update.message.reply_text(f"⚡ You have {boosts} energy boost(s)!")
+            logger.info("Sent boost count: %s", boosts)
+            return
+        
+        elif action == 'use_boost':
+            # Use an energy boost
+            user_id = update.effective_user.id
+            conn = psycopg.connect(DATABASE_URL)
+            c = conn.cursor()
+            c.execute("SELECT energy_boosts FROM referrals WHERE user_id = %s", (user_id,))
+            result = c.fetchone()
+            boosts = result[0] if result else 0
+            
+            if boosts > 0:
+                c.execute("""
+                    UPDATE referrals 
+                    SET energy_boosts = energy_boosts - 1 
+                    WHERE user_id = %s
+                """, (user_id,))
+                conn.commit()
+                await update.message.reply_text("✅ Energy boost used! Your energy is now full!")
+                logger.info("Boost used by %s", user_id)
+            else:
+                await update.message.reply_text("❌ No energy boosts available!")
+            
+            c.close()
+            conn.close()
+            return
+        
+        # Default: sync score
         score = data.get('score', 0)
         
         logger.info("📊 Score: %s", score)
@@ -187,6 +329,8 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
+    app.add_handler(CommandHandler("invite", invite_command))
+    app.add_handler(CommandHandler("boosts", boosts_command))
     app.add_handler(CommandHandler("debug", debug_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     

@@ -89,6 +89,10 @@
         <div id="energy-container"><div id="energy-bar"></div></div>
         
         <button class="btn" id="boost-btn" onclick="toggleBoosts()">🚀 BOOSTS</button>
+        <div style="display: flex; gap: 10px; width: 90%; max-width: 400px;">
+            <button class="btn" style="flex: 1;" onclick="inviteFriends()">🎁 INVITE</button>
+            <button class="btn" style="flex: 1;" id="refill-btn" onclick="useEnergyBoost()">⚡ REFILL</button>
+        </div>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 SYNC & RANK</button>
     </div>
     <script>
@@ -241,6 +245,60 @@
             } else {
                 panel.classList.add('hidden');
                 btn.innerText = "🚀 BOOSTS";
+            }
+        }
+        
+        function inviteFriends() {
+            const userId = tg.initDataUnsafe?.user?.id;
+            if (!userId) {
+                tg.showAlert("Unable to get user ID");
+                return;
+            }
+            
+            const botUsername = "BertTapBot"; // Replace with your actual bot username
+            const inviteLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+            const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started:\n${inviteLink}`;
+            
+            // Use Telegram's share function
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
+            tg.openLink(shareUrl);
+        }
+        
+        function useEnergyBoost() {
+            if (isLoading) return;
+            
+            const maxEnergy = getMaxEnergy();
+            if (energy >= maxEnergy) {
+                tg.showAlert("Your energy is already full!");
+                return;
+            }
+            
+            const btn = document.getElementById('refill-btn');
+            btn.innerText = "⏳ USING...";
+            btn.disabled = true;
+            
+            // Send request to use boost
+            const dataToSend = JSON.stringify({ 
+                action: 'use_boost'
+            });
+            
+            try {
+                tg.sendData(dataToSend);
+                
+                // Refill energy locally
+                energy = maxEnergy;
+                updateUI();
+                
+                setTimeout(() => {
+                    btn.innerText = "⚡ REFILL";
+                    btn.disabled = false;
+                }, 2000);
+                
+            } catch (e) {
+                console.error('Boost error:', e);
+                tg.showAlert("Error using boost: " + e.message);
+                btn.innerText = "⚡ REFILL";
+                btn.disabled = false;
             }
         }
         
