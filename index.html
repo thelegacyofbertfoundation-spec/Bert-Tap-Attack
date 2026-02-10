@@ -13,7 +13,20 @@
             height: 100vh; display: flex; flex-direction: column; 
             justify-content: space-between; overflow: hidden; touch-action: manipulation;
         }
-        #header { padding-top: 20px; }
+        #header { padding-top: 20px; position: relative; }
+        #unlocks-btn { position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
+        #unlocks-btn:active { transform: scale(0.95); }
+        .unlocks-panel { background: rgba(0, 0, 0, 0.95); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; top: 70px; left: 50%; transform: translateX(-50%); box-shadow: 0 5px 20px rgba(0,0,0,0.5); border: 2px solid #9b59b6; z-index: 100; max-height: 70vh; overflow-y: auto; }
+        .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
+        .card-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 15px; text-align: center; border: 2px solid #555; position: relative; }
+        .card-item.locked { opacity: 0.5; filter: grayscale(100%); }
+        .card-item.unlocked { border-color: #9b59b6; box-shadow: 0 0 15px rgba(155, 89, 182, 0.5); }
+        .card-image { width: 100%; height: 120px; object-fit: contain; margin-bottom: 10px; }
+        .card-locked-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; }
+        .card-name { font-weight: bold; color: #f1c40f; font-size: 0.9rem; margin-bottom: 5px; }
+        .card-cost { color: #bbb; font-size: 0.8rem; margin-bottom: 10px; }
+        .card-unlock-btn { background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; border: none; padding: 8px 15px; border-radius: 15px; font-weight: bold; cursor: pointer; font-size: 0.85rem; width: 100%; }
+        .card-unlock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         #coin-icon { width: 120px; height: 120px; margin-bottom: 10px; animation: float 3s ease-in-out infinite; }
         @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
         #score { font-size: 3.5rem; font-weight: bold; text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); margin: 10px 0; }
@@ -54,6 +67,32 @@
 <body>
     <div id="loading"><div>Loading...</div></div>
     <div id="header">
+        <button id="unlocks-btn" onclick="toggleUnlocks()">🎴 UNLOCKS</button>
+        
+        <div id="unlocks-panel" class="unlocks-panel hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="font-size: 1.3rem; font-weight: bold; color: #9b59b6;">🎴 Card Unlocks</div>
+                <button onclick="toggleUnlocks()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 15px; font-weight: bold; cursor: pointer;">✖️ CLOSE</button>
+            </div>
+            
+            <div style="color: #bbb; font-size: 0.85rem; margin-bottom: 15px; text-align: center;">
+                Unlock rare cards by reaching milestones!
+            </div>
+            
+            <div class="card-grid">
+                <!-- Card 1 -->
+                <div class="card-item" id="card-1" data-card="1">
+                    <div class="card-locked-overlay" id="lock-1">🔒</div>
+                    <img src="card_1.png" class="card-image" id="img-1" style="display: none;">
+                    <div class="card-name">Mystery Card #1</div>
+                    <div class="card-cost">Cost: 1,000,000 coins</div>
+                    <button class="card-unlock-btn" onclick="unlockCard(1)" id="unlock-btn-1">UNLOCK</button>
+                </div>
+                
+                <!-- More cards will be added here -->
+            </div>
+        </div>
+        
         <img src="coin.png" id="coin-icon">
         <div id="score">0</div>
     </div>
@@ -149,6 +188,13 @@
         let maxEnergyLevel = 1;
         let energyRegenLevel = 1;
         
+        // Card unlock system
+        let unlockedCards = []; // Array of unlocked card IDs
+        const CARD_COSTS = {
+            1: 1000000,
+            // More cards can be added here later
+        };
+        
         function getMaxEnergy() {
             return 1000 + (maxEnergyLevel - 1) * 500;
         }
@@ -169,7 +215,7 @@
         }
         
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards'], (err, values) => {
             if (!err && values) {
                 const savedVersion = parseInt(values.gameVersion) || 1;
                 
@@ -203,6 +249,13 @@
                     tapPowerLevel = parseInt(values.tapPowerLevel) || 1;
                     maxEnergyLevel = parseInt(values.maxEnergyLevel) || 1;
                     energyRegenLevel = parseInt(values.energyRegenLevel) || 1;
+                    
+                    // Load unlocked cards
+                    try {
+                        unlockedCards = JSON.parse(values.unlockedCards || '[]');
+                    } catch (e) {
+                        unlockedCards = [];
+                    }
                 }
                 
                 // Apply boosts
@@ -260,6 +313,7 @@
                 tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
                 tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
                 tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+                tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             } 
         }, 30000);
         
@@ -371,10 +425,14 @@
             const panel = document.getElementById('boost-panel');
             const btn = document.getElementById('boost-btn');
             const refillPanel = document.getElementById('refill-panel');
+            const unlocksPanel = document.getElementById('unlocks-panel');
             
-            // Close refill panel if open
+            // Close other panels
             if (!refillPanel.classList.contains('hidden')) {
                 refillPanel.classList.add('hidden');
+            }
+            if (!unlocksPanel.classList.contains('hidden')) {
+                unlocksPanel.classList.add('hidden');
             }
             
             if (panel.classList.contains('hidden')) {
@@ -390,11 +448,15 @@
             const panel = document.getElementById('refill-panel');
             const boostPanel = document.getElementById('boost-panel');
             const boostBtn = document.getElementById('boost-btn');
+            const unlocksPanel = document.getElementById('unlocks-panel');
             
-            // Close boost panel if open
+            // Close other panels
             if (!boostPanel.classList.contains('hidden')) {
                 boostPanel.classList.add('hidden');
                 boostBtn.innerText = "🚀 BOOSTS";
+            }
+            if (!unlocksPanel.classList.contains('hidden')) {
+                unlocksPanel.classList.add('hidden');
             }
             
             if (panel.classList.contains('hidden')) {
@@ -404,6 +466,102 @@
             } else {
                 panel.classList.add('hidden');
             }
+        }
+        
+        function toggleUnlocks() {
+            const panel = document.getElementById('unlocks-panel');
+            const boostPanel = document.getElementById('boost-panel');
+            const boostBtn = document.getElementById('boost-btn');
+            const refillPanel = document.getElementById('refill-panel');
+            
+            // Close other panels
+            if (!boostPanel.classList.contains('hidden')) {
+                boostPanel.classList.add('hidden');
+                boostBtn.innerText = "🚀 BOOSTS";
+            }
+            if (!refillPanel.classList.contains('hidden')) {
+                refillPanel.classList.add('hidden');
+            }
+            
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                updateCardDisplay();
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+        
+        function unlockCard(cardId) {
+            const cost = CARD_COSTS[cardId];
+            
+            if (!cost) {
+                tg.showAlert("Invalid card!");
+                return;
+            }
+            
+            if (unlockedCards.includes(cardId)) {
+                tg.showAlert("You already own this card!");
+                return;
+            }
+            
+            if (score < cost) {
+                tg.showAlert(`Not enough coins! You need ${cost.toLocaleString()} coins.\n\nYou have: ${score.toLocaleString()}`);
+                return;
+            }
+            
+            // Deduct coins
+            score -= cost;
+            
+            // Unlock card
+            unlockedCards.push(cardId);
+            
+            // Save to cloud storage
+            tg.CloudStorage.setItem('score', String(score));
+            tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+            
+            // Update UI
+            updateUI();
+            updateCardDisplay();
+            
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert(`🎉 Card Unlocked!\n\nYou unlocked Mystery Card #${cardId}!`);
+        }
+        
+        function updateCardDisplay() {
+            // Update each card's display based on unlock status
+            Object.keys(CARD_COSTS).forEach(cardId => {
+                const cardNum = parseInt(cardId);
+                const cardItem = document.getElementById(`card-${cardNum}`);
+                const lockIcon = document.getElementById(`lock-${cardNum}`);
+                const cardImage = document.getElementById(`img-${cardNum}`);
+                const unlockBtn = document.getElementById(`unlock-btn-${cardNum}`);
+                
+                if (unlockedCards.includes(cardNum)) {
+                    // Card is unlocked
+                    cardItem.classList.remove('locked');
+                    cardItem.classList.add('unlocked');
+                    lockIcon.style.display = 'none';
+                    cardImage.style.display = 'block';
+                    unlockBtn.innerText = 'OWNED';
+                    unlockBtn.disabled = true;
+                } else {
+                    // Card is locked
+                    cardItem.classList.add('locked');
+                    cardItem.classList.remove('unlocked');
+                    lockIcon.style.display = 'block';
+                    cardImage.style.display = 'none';
+                    
+                    // Check if player can afford it
+                    const cost = CARD_COSTS[cardNum];
+                    if (score >= cost) {
+                        unlockBtn.disabled = false;
+                        unlockBtn.innerText = 'UNLOCK';
+                    } else {
+                        unlockBtn.disabled = true;
+                        unlockBtn.innerText = `Need ${(cost - score).toLocaleString()} more`;
+                    }
+                }
+            });
         }
         
         function fetchRefillCount() {
@@ -537,6 +695,7 @@
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+            tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
@@ -558,6 +717,7 @@
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+            tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -594,6 +754,7 @@
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+            tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
         });
     </script>
 </body>
