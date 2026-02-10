@@ -54,15 +54,23 @@
         
         let score = 0, tapPower = 1, energy = 100, totalTaps = 0, isLoading = true;
         
+        console.log('Game loading...');
+        console.log('Telegram WebApp version:', tg.version);
+        console.log('Platform:', tg.platform);
+        
+        // Load from cloud storage
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
+            console.log('Cloud storage loaded - Error:', err, 'Values:', values);
             if (!err && values) {
                 score = parseInt(values.score) || 0;
                 tapPower = parseInt(values.tapPower) || 1;
                 totalTaps = parseInt(values.totalTaps) || 0;
+                console.log('Loaded from cloud - Score:', score, 'TapPower:', tapPower, 'TotalTaps:', totalTaps);
             }
             updateUI();
             isLoading = false;
             document.getElementById('loading').classList.add('hidden');
+            console.log('Game ready! Current score:', score);
         });
         
         setTimeout(() => { 
@@ -121,27 +129,46 @@
             const btn = document.getElementById('sync-btn');
             if (isLoading || btn.disabled) return;
             
-            btn.innerText = "🚀 SENDING...";
+            btn.innerText = "💾 SAVING...";
             btn.disabled = true;
             
-            tg.CloudStorage.setItem('score', String(score));
-            tg.CloudStorage.setItem('tapPower', String(tapPower));
-            tg.CloudStorage.setItem('totalTaps', String(totalTaps));
-            
-            const dataToSend = JSON.stringify({ 
-                score: score,
-                totalTaps: totalTaps
+            // FIRST: Save to cloud storage and WAIT for it to complete
+            tg.CloudStorage.setItems({
+                'score': String(score),
+                'tapPower': String(tapPower),
+                'totalTaps': String(totalTaps)
+            }, (error, success) => {
+                if (!success) {
+                    console.error('Cloud storage failed:', error);
+                    tg.showAlert("Save failed! Please try again.");
+                    btn.innerText = "💾 SYNC & RANK";
+                    btn.disabled = false;
+                    return;
+                }
+                
+                console.log('Cloud storage saved successfully');
+                btn.innerText = "🚀 SENDING...";
+                
+                // SECOND: After cloud save succeeds, send to bot
+                const dataToSend = JSON.stringify({ 
+                    score: score,
+                    totalTaps: totalTaps
+                });
+                
+                try {
+                    tg.sendData(dataToSend);
+                    console.log('Data sent to bot');
+                    
+                    // Close after delay
+                    setTimeout(() => tg.close(), 1000);
+                    
+                } catch (e) {
+                    console.error('Send error:', e);
+                    tg.showAlert("Error: " + e.message);
+                    btn.innerText = "💾 SYNC & RANK";
+                    btn.disabled = false;
+                }
             });
-            
-            try {
-                tg.sendData(dataToSend);
-                setTimeout(() => tg.close(), 500);
-            } catch (e) {
-                console.error('Send error:', e);
-                tg.showAlert("Error: " + e.message);
-                btn.innerText = "💾 SYNC & RANK";
-                btn.disabled = false;
-            }
         }
         
         window.addEventListener('beforeunload', () => {
