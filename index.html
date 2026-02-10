@@ -36,6 +36,7 @@
         .btn:active { transform: scale(0.95); }
         .btn:disabled { opacity: 0.6; }
         .btn-small { padding: 12px 20px; font-size: 0.95rem; width: auto; min-width: 150px; }
+        .badge { position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; border: 2px solid #1a1a1a; }
         .boost-panel { background: rgba(0, 0, 0, 0.95); padding: 15px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); border: 2px solid #f1c40f; }
         .boost-item { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         .boost-info { text-align: left; flex: 1; }
@@ -249,15 +250,18 @@
         }
         
         function inviteFriends() {
-            const userId = tg.initDataUnsafe?.user?.id;
+            // Try multiple ways to get user ID
+            const userId = tg.initDataUnsafe?.user?.id || 
+                          window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+            
             if (!userId) {
-                tg.showAlert("Unable to get user ID");
+                tg.showAlert("Please open the game from the Menu button to use this feature");
                 return;
             }
             
             const botUsername = "berttapbot";
             const inviteLink = `https://t.me/${botUsername}?start=ref_${userId}`;
-            const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started:\n${inviteLink}`;
+            const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started!`;
             
             // Use Telegram's share function
             const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
@@ -277,29 +281,24 @@
             btn.innerText = "⏳ USING...";
             btn.disabled = true;
             
-            // Send request to use boost
+            // Refill energy optimistically (bot will validate if boost exists)
+            energy = maxEnergy;
+            updateUI();
+            
+            // Send request to use boost (bot will confirm or deny)
             const dataToSend = JSON.stringify({ 
                 action: 'use_boost'
             });
             
-            try {
-                tg.sendData(dataToSend);
-                
-                // Refill energy locally
-                energy = maxEnergy;
-                updateUI();
-                
-                setTimeout(() => {
+            setTimeout(() => {
+                try {
+                    tg.sendData(dataToSend);
+                } catch (e) {
+                    console.error('Boost error:', e);
                     btn.innerText = "⚡ REFILL";
                     btn.disabled = false;
-                }, 2000);
-                
-            } catch (e) {
-                console.error('Boost error:', e);
-                tg.showAlert("Error using boost: " + e.message);
-                btn.innerText = "⚡ REFILL";
-                btn.disabled = false;
-            }
+                }
+            }, 500);
         }
         
         function buyBoost(type) {

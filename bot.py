@@ -130,6 +130,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         conn.commit()
                         logger.info("✅ Referral tracked: %s referred by %s", user_id, referrer_id)
+                        
+                        # Notify referrer about their reward
+                        try:
+                            await context.bot.send_message(
+                                chat_id=referrer_id,
+                                text="🎁 *Congratulations!*\n\n"
+                                     "Someone used your invite link!\n\n"
+                                     "✅ You earned 1 Energy Refill Boost!\n\n"
+                                     "Use /boosts to see your rewards or click ⚡ REFILL in the game!",
+                                parse_mode='Markdown'
+                            )
+                        except Exception as e:
+                            logger.error("Could not notify referrer: %s", e)
                     
                     c.close()
                     conn.close()
@@ -193,17 +206,20 @@ async def boosts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         conn = psycopg.connect(DATABASE_URL)
         c = conn.cursor()
-        c.execute("SELECT energy_boosts FROM referrals WHERE user_id = %s", (user_id,))
+        c.execute("SELECT energy_boosts, total_referrals FROM referrals WHERE user_id = %s", (user_id,))
         result = c.fetchone()
         boosts = result[0] if result else 0
+        total_refs = result[1] if result else 0
         c.close()
         conn.close()
         
         await update.message.reply_text(
             f"⚡ *Your Energy Boosts*\n\n"
-            f"Available: {boosts} boost(s)\n\n"
-            f"Each boost gives you a full energy refill in the game!\n\n"
-            f"Use them in the game by clicking the ⚡ REFILL button.",
+            f"Available: *{boosts}* boost(s)\n"
+            f"Total referrals: {total_refs}\n\n"
+            f"💡 *How to use:*\n"
+            f"Open the game and click the *⚡ REFILL* button to use a boost!\n\n"
+            f"🎁 Earn more by inviting friends with /invite",
             parse_mode='Markdown'
         )
     except Exception as e:
@@ -271,10 +287,19 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     WHERE user_id = %s
                 """, (user_id,))
                 conn.commit()
-                await update.message.reply_text("✅ Energy boost used! Your energy is now full!")
-                logger.info("Boost used by %s", user_id)
+                new_count = boosts - 1
+                await update.message.reply_text(
+                    f"✅ *Energy Refilled!*\n\n"
+                    f"Boosts remaining: {new_count}",
+                    parse_mode='Markdown'
+                )
+                logger.info("Boost used by %s, remaining: %s", user_id, new_count)
             else:
-                await update.message.reply_text("❌ No energy boosts available!")
+                await update.message.reply_text(
+                    "❌ *No boosts available!*\n\n"
+                    "💡 Invite friends with /invite to earn more boosts!",
+                    parse_mode='Markdown'
+                )
             
             c.close()
             conn.close()
