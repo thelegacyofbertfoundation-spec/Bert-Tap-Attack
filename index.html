@@ -175,23 +175,24 @@
                 
                 // Check if version changed (admin reset)
                 if (savedVersion !== GAME_VERSION) {
-                    // Version mismatch - reset boost levels
+                    // Version mismatch - FULL RESET
+                    score = 0;
+                    totalTaps = 0;
+                    energy = 1000;
                     tapPowerLevel = 1;
                     maxEnergyLevel = 1;
                     energyRegenLevel = 1;
                     
-                    // Keep score and energy, just reset boosts
-                    score = parseInt(values.score) || 0;
-                    totalTaps = parseInt(values.totalTaps) || 0;
-                    energy = parseInt(values.energy) || 1000;
-                    
-                    // Save new version and reset boosts
+                    // Save new version and reset everything
                     tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+                    tg.CloudStorage.setItem('score', '0');
+                    tg.CloudStorage.setItem('totalTaps', '0');
+                    tg.CloudStorage.setItem('energy', '1000');
                     tg.CloudStorage.setItem('tapPowerLevel', '1');
                     tg.CloudStorage.setItem('maxEnergyLevel', '1');
                     tg.CloudStorage.setItem('energyRegenLevel', '1');
                     
-                    tg.showAlert("🔄 Game Updated!\n\nYour boost levels have been reset.\nYour score is safe!");
+                    tg.showAlert("🔄 Game Reset!\n\nAll progress has been reset.\nEveryone starts fresh!");
                 } else {
                     // Normal load - same version
                     score = parseInt(values.score) || 0;

@@ -26,7 +26,7 @@ You now have a complete reset system with TWO parts:
 
 ---
 
-## PART 2: Reset Everyone's Boost Levels (Version System)
+## PART 2: Reset Everyone's Everything (Version System)
 
 ### Change the GAME_VERSION number:
 
@@ -40,9 +40,12 @@ You now have a complete reset system with TWO parts:
 3. **Deploy index.html to GitHub Pages**
 
 **Result:**
-- ✅ Next time ANYONE opens the game, their boosts reset to Level 1
-- ✅ Their score stays safe
-- ✅ They see: "🔄 Game Updated! Your boost levels have been reset. Your score is safe!"
+- ✅ Next time ANYONE opens the game, EVERYTHING resets:
+  - Coins (score) → 0
+  - Boost levels → Level 1
+  - Total taps → 0
+  - Energy → Full (1000)
+- ✅ They see: "🔄 Game Reset! All progress has been reset. Everyone starts fresh!"
 
 ---
 
@@ -50,25 +53,29 @@ You now have a complete reset system with TWO parts:
 
 To completely reset the game for everyone:
 
-**Step 1:** Send `/reset_all` to bot
+**Option A: Just Change Version Number**
+```javascript
+const GAME_VERSION = 3; // Changed from 2
+```
+Deploy index.html → Everyone resets when they open the game
+
+**Option B: Reset Database + Version (Recommended)**
+
+**Step 1:** Send `/reset_all` to bot (clears leaderboard database)
 ```
 ✅ All Scores Reset
 
 Reset 47 player(s) to 0 points.
 ```
 
-**Step 2:** Change GAME_VERSION in index.html
+**Step 2:** Change GAME_VERSION in index.html (clears client storage)
 ```javascript
 const GAME_VERSION = 3; // Changed from 2
 ```
 
 **Step 3:** Deploy index.html to GitHub Pages
 
-**Step 4:** Done! Next time players open:
-- Scores: 0
-- Boost levels: Reset to 1
-- Energy: Full
-- Fresh start! 🎮
+**Result:** Complete fresh start - database AND client storage both cleared!
 
 ---
 
@@ -99,17 +106,19 @@ You can use version numbers to track major changes:
 
 ### Scores:
 - **Database-side**: Use `/reset_all` bot command
-- Resets everyone instantly
+- Resets leaderboard instantly
 - Permanent (no undo)
 
-### Boost Levels:
+### Client Progress (Coins, Boosts, etc.):
 - **Client-side**: Change GAME_VERSION
 - Resets when player opens game
+- Includes: coins, boost levels, total taps, energy
 - Gradual (as players reconnect)
 
-### Both Together:
-- Use both methods for complete fresh start
-- Recommended for major game rebalancing
+### Both Together (Recommended):
+- Use both methods for complete clean slate
+- `/reset_all` clears database
+- `GAME_VERSION` clears all client data
 - Announce to players beforehand
 
 ---
@@ -145,17 +154,18 @@ Before resetting for everyone:
 
 **They see:**
 ```
-🔄 Game Updated!
+🔄 Game Reset!
 
-Your boost levels have been reset.
-Your score is safe!
+All progress has been reset.
+Everyone starts fresh!
 ```
 
 **What happens:**
+- Coins (score) → 0
 - All boosts → Level 1
-- Score → 0 (if you used /reset_all) OR kept
-- Energy → Full
-- Clean slate!
+- Total taps → 0
+- Energy → Full (1000)
+- Complete fresh start!
 
 ---
 
@@ -173,9 +183,9 @@ Your score is safe!
 
 | Action | Command | Effect |
 |--------|---------|--------|
-| **Reset all scores** | `/reset_all` | Leaderboard → 0 |
-| **Reset boost levels** | Change `GAME_VERSION` | All players → Level 1 |
-| **Complete reset** | Both above | Everything fresh |
+| **Reset database** | `/reset_all` | Leaderboard scores → 0 |
+| **Reset everything** | Change `GAME_VERSION` | Coins, boosts, taps → 0 |
+| **Complete reset** | Both above (recommended) | Database + Client storage |
 | **View leaderboard** | `/leaderboard` | See current scores |
 | **Check cheaters** | `/cheaters` | View flagged users |
 
