@@ -127,6 +127,9 @@
         tg.ready(); 
         tg.expand();
         
+        // Game version - increment this to reset everyone's boost levels
+        const GAME_VERSION = 2; // Change this number to force a reset
+        
         let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
         const MAX_ENERGY = 1000;
         
@@ -166,16 +169,40 @@
         }
         
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion'], (err, values) => {
             if (!err && values) {
-                score = parseInt(values.score) || 0;
-                totalTaps = parseInt(values.totalTaps) || 0;
-                energy = parseInt(values.energy) || 1000;
+                const savedVersion = parseInt(values.gameVersion) || 1;
                 
-                // Load boost levels
-                tapPowerLevel = parseInt(values.tapPowerLevel) || 1;
-                maxEnergyLevel = parseInt(values.maxEnergyLevel) || 1;
-                energyRegenLevel = parseInt(values.energyRegenLevel) || 1;
+                // Check if version changed (admin reset)
+                if (savedVersion !== GAME_VERSION) {
+                    // Version mismatch - reset boost levels
+                    tapPowerLevel = 1;
+                    maxEnergyLevel = 1;
+                    energyRegenLevel = 1;
+                    
+                    // Keep score and energy, just reset boosts
+                    score = parseInt(values.score) || 0;
+                    totalTaps = parseInt(values.totalTaps) || 0;
+                    energy = parseInt(values.energy) || 1000;
+                    
+                    // Save new version and reset boosts
+                    tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
+                    tg.CloudStorage.setItem('tapPowerLevel', '1');
+                    tg.CloudStorage.setItem('maxEnergyLevel', '1');
+                    tg.CloudStorage.setItem('energyRegenLevel', '1');
+                    
+                    tg.showAlert("🔄 Game Updated!\n\nYour boost levels have been reset.\nYour score is safe!");
+                } else {
+                    // Normal load - same version
+                    score = parseInt(values.score) || 0;
+                    totalTaps = parseInt(values.totalTaps) || 0;
+                    energy = parseInt(values.energy) || 1000;
+                    
+                    // Load boost levels
+                    tapPowerLevel = parseInt(values.tapPowerLevel) || 1;
+                    maxEnergyLevel = parseInt(values.maxEnergyLevel) || 1;
+                    energyRegenLevel = parseInt(values.energyRegenLevel) || 1;
+                }
                 
                 // Apply boosts
                 tapPower = getTapPower();
@@ -189,6 +216,9 @@
                 document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
                 document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
                 document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
+            } else {
+                // First time player - set version
+                tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             }
             updateUI();
             isLoading = false;
@@ -228,6 +258,7 @@
                 tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
                 tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
                 tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+                tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             } 
         }, 30000);
         
@@ -504,6 +535,7 @@
             tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+            tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
@@ -524,6 +556,7 @@
             tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+            tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -559,6 +592,7 @@
             tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+            tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
         });
     </script>
 </body>
