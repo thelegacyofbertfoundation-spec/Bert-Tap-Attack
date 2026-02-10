@@ -161,7 +161,7 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def invite_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("🎁 /invite from user %s", update.effective_user.id)
     user_id = update.effective_user.id
-    bot_username = "BertTapBot"  # Replace with your actual bot username
+    bot_username = "berttapbot"
     invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     
     try:
