@@ -90,16 +90,18 @@ def get_rank():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("📩 /start from user %s", update.effective_user.id)
     try:
+        keyboard = [[KeyboardButton(text="🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        
         await update.message.reply_text(
             "🎮 *Bert Tap Attack* 🎮\n\n"
             "✅ *HOW TO PLAY:*\n"
-            "Tap the *☰ Menu button* (bottom-left corner of Telegram) "
-            "and select *Play Game*\n\n"
-            "⚠️ Don't use the keyboard button - use the menu button for scores to save!\n\n"
+            "Use the *☰ Menu button* (bottom-left) → Play Game\n\n"
             "*Commands:*\n"
             "/leaderboard - View top players\n"
             "/debug - Check your score",
-            parse_mode='Markdown'
+            parse_mode='Markdown',
+            reply_markup=reply_markup
         )
     except Exception as e:
         logger.error("❌ Start error: %s", e)
