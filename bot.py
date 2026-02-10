@@ -140,14 +140,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         data = json.loads(update.effective_message.web_app_data.data)
         score = data.get('score', 0)
-        flagged = data.get('flagged', False)
         
         logger.info("📊 Score: %s", score)
-        
-        if flagged:
-            logger.warning("🚫 CHEATER DETECTED! User %s flagged by client", update.effective_user.id)
-            await update.message.reply_text("🚫 AUTO-TAPPER DETECTED!\n\nYour score has been rejected.\n\nCheating is not tolerated!")
-            return
         
         if not isinstance(score, int) or score < 0:
             await update.message.reply_text("⚠️ Invalid score!")
