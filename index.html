@@ -320,8 +320,23 @@
         }
         
         function useRefillFromPanel() {
-            toggleRefills();
-            useEnergyBoost();
+            // If we don't know the boost count, warn user first
+            const refillCount = document.getElementById('refill-count').innerText;
+            
+            if (refillCount === "?") {
+                tg.showConfirm(
+                    "Try to use a refill?\n\nIf you don't have any, you'll be prompted to invite friends.",
+                    (confirmed) => {
+                        if (confirmed) {
+                            toggleRefills();
+                            useEnergyBoost();
+                        }
+                    }
+                );
+            } else {
+                toggleRefills();
+                useEnergyBoost();
+            }
         }
         
         function shareInviteFromPanel() {
@@ -333,12 +348,21 @@
                 return;
             }
             
-            const botUsername = "berttapbot";
-            const inviteLink = `https://t.me/${botUsername}?start=ref_${userId}`;
-            const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started!`;
-            
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
-            tg.openLink(shareUrl);
+            // Show confirmation popup
+            tg.showConfirm(
+                "Share your invite link?\n\nThis will close the game and open Telegram to share your link with friends.",
+                (confirmed) => {
+                    if (confirmed) {
+                        const botUsername = "berttapbot";
+                        const inviteLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+                        const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started!`;
+                        
+                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
+                        tg.openLink(shareUrl);
+                    }
+                    // If not confirmed, just stay in game (do nothing)
+                }
+            );
         }
         
         function useEnergyBoost() {

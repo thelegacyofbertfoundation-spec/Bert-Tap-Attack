@@ -295,9 +295,10 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 logger.info("Boost used by %s, remaining: %s", user_id, new_count)
             else:
+                # Send message that will trigger invite prompt
                 await update.message.reply_text(
                     "❌ *No boosts available!*\n\n"
-                    "💡 Invite friends with /invite to earn more boosts!",
+                    "💡 Click OK to share your invite link and earn more boosts!",
                     parse_mode='Markdown'
                 )
             
