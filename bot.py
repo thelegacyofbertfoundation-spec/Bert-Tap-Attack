@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from collections import defaultdict
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Environment variables
@@ -90,14 +90,16 @@ def get_rank():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("📩 /start from user %s", update.effective_user.id)
     try:
-        keyboard = [[KeyboardButton(text="🕹️ PLAY BERT", web_app=WebAppInfo(url=GITHUB_URL))]]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        
         await update.message.reply_text(
-            "🎮 Bert Tap Attack 🎮\n\n"
-            "Tap the 🕹️ button below to play!\n\n"
-            "/leaderboard - View rankings",
-            reply_markup=reply_markup
+            "🎮 *Bert Tap Attack* 🎮\n\n"
+            "✅ *HOW TO PLAY:*\n"
+            "Tap the *☰ Menu button* (bottom-left corner of Telegram) "
+            "and select *Play Game*\n\n"
+            "⚠️ Don't use the keyboard button - use the menu button for scores to save!\n\n"
+            "*Commands:*\n"
+            "/leaderboard - View top players\n"
+            "/debug - Check your score",
+            parse_mode='Markdown'
         )
     except Exception as e:
         logger.error("❌ Start error: %s", e)
@@ -190,12 +192,31 @@ def main():
     logger.info("🔌 Listening on 0.0.0.0:%s", actual_port)
     logger.info("📍 Webhook path: /%s", TOKEN)
     
+    # Create custom request handler for health checks
+    import tornado.web
+    
+    class HealthHandler(tornado.web.RequestHandler):
+        def get(self):
+            self.write("OK")
+            self.set_status(200)
+    
+    # Add health check route
+    extra_routes = [
+        (r"/", HealthHandler),
+        (r"/health", HealthHandler),
+    ]
+    
+    logger.info("✅ Health check endpoints added: / and /health")
+    
     app.run_webhook(
         listen="0.0.0.0",
         port=actual_port,
         url_path=TOKEN,
         webhook_url=webhook_url,
-        allowed_updates=Update.ALL_TYPES
+        allowed_updates=Update.ALL_TYPES,
+        webhook_server_kwargs={
+            "extra_handlers": extra_routes
+        }
     )
 
 if __name__ == '__main__':
