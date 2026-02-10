@@ -294,6 +294,44 @@ async def cheaters_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error("Cheaters command error: %s", e)
         await update.message.reply_text(f"❌ Error: {e}")
 
+async def reset_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to reset all scores to zero"""
+    logger.info("🔄 /reset_all from user %s", update.effective_user.id)
+    
+    # SECURITY: Add your Telegram user ID here
+    ADMIN_USER_IDS = [7137489161]  # Replace with your actual user ID
+    
+    if update.effective_user.id not in ADMIN_USER_IDS:
+        await update.message.reply_text("❌ Unauthorized. Admin only.")
+        logger.warning("⚠️ Unauthorized reset attempt by user %s", update.effective_user.id)
+        return
+    
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        
+        # Count before reset
+        c.execute("SELECT COUNT(*) FROM leaderboard")
+        count = c.fetchone()[0]
+        
+        # Reset all scores to zero
+        c.execute("UPDATE leaderboard SET score = 0")
+        conn.commit()
+        
+        c.close()
+        conn.close()
+        
+        logger.info("✅ All scores reset by admin %s", update.effective_user.id)
+        await update.message.reply_text(
+            f"✅ *All Scores Reset*\n\n"
+            f"Reset {count} player(s) to 0 points.\n\n"
+            f"Leaderboard has been cleared!",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error("Reset error: %s", e)
+        await update.message.reply_text(f"❌ Error: {e}")
+
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("🔧 /debug from user %s", update.effective_user.id)
     try:
@@ -469,6 +507,7 @@ def main():
     app.add_handler(CommandHandler("invite", invite_command))
     app.add_handler(CommandHandler("boosts", boosts_command))
     app.add_handler(CommandHandler("cheaters", cheaters_command))
+    app.add_handler(CommandHandler("reset_all", reset_all_command))
     app.add_handler(CommandHandler("debug", debug_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     
