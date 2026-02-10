@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from collections import defaultdict
-from telegram import Update
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Environment variables
