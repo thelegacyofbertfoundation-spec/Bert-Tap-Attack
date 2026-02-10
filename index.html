@@ -55,11 +55,12 @@
         let score = 0, tapPower = 1, energy = 100, totalTaps = 0, isLoading = true;
         
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy'], (err, values) => {
             if (!err && values) {
                 score = parseInt(values.score) || 0;
                 tapPower = parseInt(values.tapPower) || 1;
                 totalTaps = parseInt(values.totalTaps) || 0;
+                energy = parseInt(values.energy) || 100;
             }
             updateUI();
             isLoading = false;
@@ -93,6 +94,7 @@
                 tg.CloudStorage.setItem('score', String(score));
                 tg.CloudStorage.setItem('tapPower', String(tapPower));
                 tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+                tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
             } 
         }, 30000);
         
@@ -129,6 +131,7 @@
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+            tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -158,6 +161,7 @@
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+            tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
         });
     </script>
 </body>
