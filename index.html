@@ -58,6 +58,10 @@
         <div id="energy-container"><div id="energy-bar"></div></div>
         
         <div id="boost-panel" class="boost-panel hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 1.2rem; font-weight: bold; color: #f1c40f;">🚀 Boosts</div>
+                <button onclick="toggleBoosts()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 15px; font-weight: bold; cursor: pointer;">✖️ CLOSE</button>
+            </div>
             <div class="boost-item">
                 <div class="boost-info">
                     <div class="boost-name">⚡ Tap Power</div>
@@ -233,12 +237,10 @@
             const btn = document.getElementById('boost-btn');
             if (panel.classList.contains('hidden')) {
                 panel.classList.remove('hidden');
-                btn.innerText = "✖️ CLOSE BOOSTS";
-                btn.style.background = "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)";
+                btn.innerText = "🚀 BOOSTS ▲";
             } else {
                 panel.classList.add('hidden');
                 btn.innerText = "🚀 BOOSTS";
-                btn.style.background = "linear-gradient(135deg, #e67e22 0%, #d35400 100%)";
             }
         }
         
