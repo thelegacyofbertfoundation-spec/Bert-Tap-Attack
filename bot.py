@@ -47,6 +47,16 @@ def init_db():
                 total_referrals INTEGER DEFAULT 0
             )
         """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS cheaters (
+                user_id BIGINT PRIMARY KEY,
+                username TEXT,
+                first_flagged TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                flag_count INTEGER DEFAULT 1,
+                last_flag_reason TEXT,
+                suspicious_count INTEGER DEFAULT 0
+            )
+        """)
         conn.commit()
         c.close()
         conn.close()
@@ -94,6 +104,26 @@ def get_rank():
     except Exception as e:
         logger.error("❌ Leaderboard error: %s", e)
         return "❌ Error loading leaderboard"
+
+def log_cheater(uid, username, reason, suspicious_count):
+    """Log a cheater to the database"""
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO cheaters (user_id, username, flag_count, last_flag_reason, suspicious_count)
+            VALUES (%s, %s, 1, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE 
+            SET flag_count = cheaters.flag_count + 1,
+                last_flag_reason = %s,
+                suspicious_count = %s
+        """, (uid, str(username), reason, suspicious_count, reason, suspicious_count))
+        conn.commit()
+        c.close()
+        conn.close()
+        logger.info("📝 Cheater logged: User %s - Reason: %s", uid, reason)
+    except Exception as e:
+        logger.error("❌ Error logging cheater: %s", e)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("📩 /start from user %s", update.effective_user.id)
@@ -225,6 +255,45 @@ async def boosts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("Boosts error: %s", e)
 
+async def cheaters_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to view cheater statistics"""
+    logger.info("🚨 /cheaters from user %s", update.effective_user.id)
+    
+    try:
+        conn = psycopg.connect(DATABASE_URL)
+        c = conn.cursor()
+        c.execute("""
+            SELECT user_id, username, first_flagged, flag_count, last_flag_reason, suspicious_count 
+            FROM cheaters 
+            ORDER BY first_flagged DESC 
+            LIMIT 20
+        """)
+        res = c.fetchall()
+        c.close()
+        conn.close()
+        
+        if not res:
+            await update.message.reply_text("✅ No cheaters detected yet!")
+        else:
+            msg = f"🚨 *Cheater Log* ({len(res)} total)\n\n"
+            for row in res:
+                user_id, username, first_flagged, flag_count, reason, susp_count = row
+                msg += f"User: {username} (ID: {user_id})\n"
+                msg += f"Flags: {flag_count} | Suspicious: {susp_count}\n"
+                msg += f"Reason: {reason}\n"
+                msg += f"First: {first_flagged.strftime('%Y-%m-%d %H:%M')}\n\n"
+                
+                # Split message if too long
+                if len(msg) > 3500:
+                    await update.message.reply_text(msg, parse_mode='Markdown')
+                    msg = ""
+            
+            if msg:
+                await update.message.reply_text(msg, parse_mode='Markdown')
+    except Exception as e:
+        logger.error("Cheaters command error: %s", e)
+        await update.message.reply_text(f"❌ Error: {e}")
+
 async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("🔧 /debug from user %s", update.effective_user.id)
     try:
@@ -308,17 +377,59 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Default: sync score
         score = data.get('score', 0)
+        flagged = data.get('flagged', False)
+        suspicious_count = data.get('suspiciousCount', 0)
         
         logger.info("📊 Score: %s", score)
         
+        # === SERVER-SIDE ANTI-CHEAT ===
+        
+        # Check 1: Client flagged for cheating
+        if flagged:
+            logger.warning("🚫 CHEATER FLAGGED BY CLIENT! User %s (ID: %s)", 
+                         update.effective_user.first_name, update.effective_user.id)
+            logger.warning("   Suspicious activity count: %s", suspicious_count)
+            
+            # Log to cheaters database
+            log_cheater(
+                update.effective_user.id,
+                update.effective_user.first_name,
+                "Client-side anti-cheat: Auto-tapper/Bot pattern detected",
+                suspicious_count
+            )
+            
+            await update.message.reply_text(
+                "🚫 *ANTI-CHEAT DETECTION*\n\n"
+                "Your account was flagged for suspicious activity.\n\n"
+                "Detected: Auto-tapper or bot pattern\n\n"
+                "Your score has been rejected.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Check 2: Log suspicious but not flagged users
+        if suspicious_count > 0:
+            logger.warning("⚠️ User %s has suspicious count: %s (not flagged yet)", 
+                         update.effective_user.id, suspicious_count)
+        
+        # Check 3: Basic validation
         if not isinstance(score, int) or score < 0:
+            logger.warning("⚠️ Invalid score type from user %s: %s", 
+                         update.effective_user.id, score)
             await update.message.reply_text("⚠️ Invalid score!")
             return
         
+        # Check 4: Maximum score validation
         if score > 10000000:
-            logger.warning("🚫 SUSPICIOUS SCORE! User %s tried to submit %s", update.effective_user.id, score)
+            logger.warning("🚫 SUSPICIOUS SCORE! User %s tried to submit %s", 
+                         update.effective_user.id, score)
             await update.message.reply_text("⚠️ Score too high! Maximum 10,000,000 allowed.")
             return
+        
+        # Check 5: Impossible score rate check (optional - based on session time)
+        # TODO: Track session start time and validate score/time ratio
+        
+        # Score passed all checks - save to database
         
         update_db(update.effective_user.id, update.effective_user.first_name, score)
         await update.message.reply_text("✅ Score Synced!\n\n" + get_rank())
@@ -357,6 +468,7 @@ def main():
     app.add_handler(CommandHandler("leaderboard", leaderboard_command))
     app.add_handler(CommandHandler("invite", invite_command))
     app.add_handler(CommandHandler("boosts", boosts_command))
+    app.add_handler(CommandHandler("cheaters", cheaters_command))
     app.add_handler(CommandHandler("debug", debug_command))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     

@@ -130,9 +130,16 @@
         let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
         const MAX_ENERGY = 1000;
         
-        // Anti-cheat system
+        // Advanced Anti-cheat system
         const MAX_TAPS_PER_SECOND = 15; // Humanly possible max
+        const MIN_TAP_INTERVAL = 30; // Minimum 30ms between taps (33 taps/sec absolute max)
+        const VARIANCE_THRESHOLD = 10; // Bot detection: variance below this = suspicious
+        const PATTERN_CHECK_SIZE = 20; // Number of taps to analyze for patterns
+        
         let tapTimestamps = [];
+        let lastTapTime = 0;
+        let suspiciousActivityCount = 0;
+        let isFlagged = false;
         
         // Boost system
         let tapPowerLevel = 1;
@@ -225,19 +232,81 @@
         }, 30000);
         
         document.getElementById('face').addEventListener('click', function(e) {
-            if (energy >= 1) {
+            if (energy >= 1 && !isFlagged) {
                 const now = Date.now();
                 
-                // Anti-cheat: Simple tap rate limiting
-                tapTimestamps.push(now);
-                tapTimestamps = tapTimestamps.filter(t => now - t < 1000);
-                
-                if (tapTimestamps.length > MAX_TAPS_PER_SECOND) {
-                    tg.HapticFeedback.notificationOccurred('error');
-                    tg.showAlert("⚠️ Tapping too fast! Slow down.");
-                    return;
+                try {
+                    // === LAYER 1: Rate Limiting ===
+                    tapTimestamps.push(now);
+                    tapTimestamps = tapTimestamps.filter(t => now - t < 1000);
+                    
+                    if (tapTimestamps.length > MAX_TAPS_PER_SECOND) {
+                        suspiciousActivityCount++;
+                        tg.HapticFeedback.notificationOccurred('error');
+                        tg.showAlert("⚠️ Tapping too fast! Slow down.");
+                        
+                        if (suspiciousActivityCount >= 3) {
+                            isFlagged = true;
+                            score = 0;
+                            tg.showAlert("🚫 AUTO-TAPPER DETECTED!\n\nYour account has been flagged.\nScore reset to zero.");
+                        }
+                        return;
+                    }
+                    
+                    // === LAYER 2: Minimum Interval Check ===
+                    const timeSinceLastTap = now - lastTapTime;
+                    if (lastTapTime > 0 && timeSinceLastTap < MIN_TAP_INTERVAL) {
+                        suspiciousActivityCount++;
+                        tg.HapticFeedback.notificationOccurred('error');
+                        
+                        if (suspiciousActivityCount >= 5) {
+                            isFlagged = true;
+                            score = 0;
+                            tg.showAlert("🚫 IMPOSSIBLE TAP SPEED DETECTED!\n\nYour account has been flagged.\nScore reset to zero.");
+                        }
+                        return;
+                    }
+                    lastTapTime = now;
+                    
+                    // === LAYER 3: Bot Pattern Detection (Variance Analysis) ===
+                    if (tapTimestamps.length >= PATTERN_CHECK_SIZE) {
+                        const intervals = [];
+                        for (let i = 1; i < Math.min(tapTimestamps.length, PATTERN_CHECK_SIZE); i++) {
+                            intervals.push(tapTimestamps[i] - tapTimestamps[i-1]);
+                        }
+                        
+                        if (intervals.length >= 10) {
+                            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                            const variance = intervals.reduce((sum, interval) => {
+                                return sum + Math.pow(interval - avgInterval, 2);
+                            }, 0) / intervals.length;
+                            
+                            // Bots have very consistent intervals (low variance)
+                            // Humans naturally vary between 50-200ms variance
+                            if (variance < VARIANCE_THRESHOLD && avgInterval < 100) {
+                                suspiciousActivityCount += 2;
+                                
+                                if (suspiciousActivityCount >= 3) {
+                                    isFlagged = true;
+                                    score = 0;
+                                    tg.showAlert("🚫 BOT PATTERN DETECTED!\n\nPerfectly consistent tapping is not human.\n\nYour account has been flagged.\nScore reset to zero.");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Decay suspicious activity counter over time (forgive minor issues)
+                    if (suspiciousActivityCount > 0 && Math.random() < 0.1) {
+                        suspiciousActivityCount = Math.max(0, suspiciousActivityCount - 1);
+                    }
+                    
+                } catch (error) {
+                    // Fail silently on anti-cheat errors to prevent game breaking
+                    console.error('Anti-cheat error:', error);
                 }
                 
+                // === Normal tap processing ===
                 score += tapPower;
                 energy -= 1;
                 totalTaps += 1;
@@ -258,6 +327,9 @@
                 
                 setTimeout(() => effect.remove(), 1000);
                 updateUI();
+            } else if (isFlagged) {
+                tg.HapticFeedback.notificationOccurred('error');
+                tg.showAlert("🚫 Account flagged for cheating.\n\nRestart the game to try again.");
             } else {
                 tg.HapticFeedback.notificationOccurred('error');
             }
@@ -458,8 +530,10 @@
                 btn.innerText = "🚀 SENDING...";
                 
                 const dataToSend = JSON.stringify({ 
-                    score: score,
-                    totalTaps: totalTaps
+                    score: isFlagged ? 0 : score,
+                    totalTaps: totalTaps,
+                    flagged: isFlagged,
+                    suspiciousCount: suspiciousActivityCount
                 });
                 
                 try {
