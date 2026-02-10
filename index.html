@@ -53,6 +53,33 @@
         tg.expand();
         
         let score = 0, tapPower = 1, energy = 100, totalTaps = 0, isLoading = true;
+        let canSync = true;
+        
+        // Check if WebApp was opened with proper context for syncing
+        function checkSyncCapability() {
+            // If opened from menu button, initData should be present
+            if (!tg.initData || tg.initData.length === 0) {
+                canSync = false;
+                return false;
+            }
+            return true;
+        }
+        
+        // Show warning if can't sync
+        if (!checkSyncCapability()) {
+            setTimeout(() => {
+                tg.showAlert(
+                    "⚠️ IMPORTANT!\n\n" +
+                    "This game was opened incorrectly.\n\n" +
+                    "To save your score:\n" +
+                    "1. Close this\n" +
+                    "2. Open Telegram chat\n" +
+                    "3. Click ☰ Menu (bottom-left)\n" +
+                    "4. Select 'Play Game'\n\n" +
+                    "Otherwise your score won't be saved!"
+                );
+            }, 500);
+        }
         
         // Load from cloud storage
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps'], (err, values) => {
@@ -64,13 +91,27 @@
             updateUI();
             isLoading = false;
             document.getElementById('loading').classList.add('hidden');
+            
+            // Update button if can't sync
+            if (!canSync) {
+                const btn = document.getElementById('sync-btn');
+                btn.innerText = "⚠️ REOPEN TO SYNC";
+                btn.style.background = "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)";
+            }
         });
         
         setTimeout(() => { 
             if (isLoading) { 
                 isLoading = false; 
                 document.getElementById('loading').classList.add('hidden'); 
-                updateUI(); 
+                updateUI();
+                
+                // Update button if can't sync
+                if (!canSync) {
+                    const btn = document.getElementById('sync-btn');
+                    btn.innerText = "⚠️ REOPEN TO SYNC";
+                    btn.style.background = "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)";
+                }
             } 
         }, 3000);
         
@@ -125,6 +166,17 @@
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
             if (isLoading || btn.disabled) return;
+            
+            // Check if sync is possible
+            if (!canSync) {
+                tg.showAlert(
+                    "❌ Cannot sync from here!\n\n" +
+                    "Close this and reopen using:\n" +
+                    "☰ Menu (bottom-left) → Play Game\n\n" +
+                    "Your progress is saved locally and will sync when opened correctly."
+                );
+                return;
+            }
             
             btn.innerText = "🚀 SENDING...";
             btn.disabled = true;
