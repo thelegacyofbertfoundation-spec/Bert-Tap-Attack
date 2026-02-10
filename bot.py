@@ -192,31 +192,12 @@ def main():
     logger.info("🔌 Listening on 0.0.0.0:%s", actual_port)
     logger.info("📍 Webhook path: /%s", TOKEN)
     
-    # Create custom request handler for health checks
-    import tornado.web
-    
-    class HealthHandler(tornado.web.RequestHandler):
-        def get(self):
-            self.write("OK")
-            self.set_status(200)
-    
-    # Add health check route
-    extra_routes = [
-        (r"/", HealthHandler),
-        (r"/health", HealthHandler),
-    ]
-    
-    logger.info("✅ Health check endpoints added: / and /health")
-    
     app.run_webhook(
         listen="0.0.0.0",
         port=actual_port,
         url_path=TOKEN,
         webhook_url=webhook_url,
-        allowed_updates=Update.ALL_TYPES,
-        webhook_server_kwargs={
-            "extra_handlers": extra_routes
-        }
+        allowed_updates=Update.ALL_TYPES
     )
 
 if __name__ == '__main__':
