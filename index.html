@@ -37,6 +37,10 @@
         .btn:disabled { opacity: 0.6; }
         .btn-small { padding: 12px 20px; font-size: 0.95rem; width: auto; min-width: 150px; }
         .badge { position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; border: 2px solid #1a1a1a; }
+        .refill-panel { background: rgba(0, 0, 0, 0.95); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); border: 2px solid #3498db; }
+        .refill-info { text-align: center; margin: 15px 0; }
+        .refill-count { font-size: 3rem; font-weight: bold; color: #3498db; }
+        .refill-text { color: #bbb; font-size: 0.9rem; margin: 10px 0; line-height: 1.6; }
         .boost-panel { background: rgba(0, 0, 0, 0.95); padding: 15px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); border: 2px solid #f1c40f; }
         .boost-item { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         .boost-info { text-align: left; flex: 1; }
@@ -55,6 +59,31 @@
     </div>
     <div id="game-area"><img id="face" src="face.png"></div>
     <div class="footer">
+        <div id="refill-panel" class="refill-panel hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="font-size: 1.2rem; font-weight: bold; color: #3498db;">⚡ Energy Refills</div>
+                <button onclick="toggleRefills()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 15px; font-weight: bold; cursor: pointer;">✖️ CLOSE</button>
+            </div>
+            
+            <div class="refill-info">
+                <div class="refill-count" id="refill-count">?</div>
+                <div style="color: #3498db; font-weight: bold; margin-bottom: 20px;">Available Refills</div>
+                
+                <button class="btn" onclick="useRefillFromPanel()" id="use-refill-btn" style="margin-bottom: 15px;">⚡ USE REFILL NOW</button>
+                
+                <div class="refill-text">
+                    <strong style="color: #f1c40f;">🎁 How to Get More Refills:</strong><br>
+                    Invite friends to play and earn 1 refill per friend!<br><br>
+                    1. Click "SHARE INVITE" below<br>
+                    2. Send your unique link to friends<br>
+                    3. When they join, you get a refill!<br>
+                    4. Use refills to instantly fill your energy
+                </div>
+                
+                <button class="btn" onclick="shareInviteFromPanel()" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); margin-top: 15px;">📤 SHARE INVITE LINK</button>
+            </div>
+        </div>
+        
         <div id="boost-panel" class="boost-panel hidden">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="font-size: 1.2rem; font-weight: bold; color: #f1c40f;">🚀 Boosts</div>
@@ -63,7 +92,7 @@
             <div class="boost-item">
                 <div class="boost-info">
                     <div class="boost-name">⚡ Tap Power</div>
-                    <div class="boost-cost">Cost: <span id="tap-cost">100</span> taps</div>
+                    <div class="boost-cost">Cost: <span id="tap-cost">100</span> coins</div>
                     <div class="boost-level">Level: <span id="tap-level">1</span></div>
                 </div>
                 <button class="btn btn-small" onclick="buyBoost('tap')">BUY</button>
@@ -71,7 +100,7 @@
             <div class="boost-item">
                 <div class="boost-info">
                     <div class="boost-name">🔋 Max Energy</div>
-                    <div class="boost-cost">Cost: <span id="energy-cost">500</span> taps</div>
+                    <div class="boost-cost">Cost: <span id="energy-cost">500</span> coins</div>
                     <div class="boost-level">Level: <span id="energy-level">1</span></div>
                 </div>
                 <button class="btn btn-small" onclick="buyBoost('energy')">BUY</button>
@@ -79,7 +108,7 @@
             <div class="boost-item">
                 <div class="boost-info">
                     <div class="boost-name">⚡ Energy Regen</div>
-                    <div class="boost-cost">Cost: <span id="regen-cost">300</span> taps</div>
+                    <div class="boost-cost">Cost: <span id="regen-cost">300</span> coins</div>
                     <div class="boost-level">Level: <span id="regen-level">1</span></div>
                 </div>
                 <button class="btn btn-small" onclick="buyBoost('regen')">BUY</button>
@@ -90,10 +119,7 @@
         <div id="energy-container"><div id="energy-bar"></div></div>
         
         <button class="btn" id="boost-btn" onclick="toggleBoosts()">🚀 BOOSTS</button>
-        <div style="display: flex; gap: 10px; width: 90%; max-width: 400px;">
-            <button class="btn" style="flex: 1;" onclick="inviteFriends()">🎁 INVITE</button>
-            <button class="btn" style="flex: 1;" id="refill-btn" onclick="useEnergyBoost()">⚡ REFILL</button>
-        </div>
+        <button class="btn" id="refill-btn" onclick="toggleRefills()">⚡ REFILL</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 SYNC & RANK</button>
     </div>
     <script>
@@ -240,6 +266,13 @@
         function toggleBoosts() {
             const panel = document.getElementById('boost-panel');
             const btn = document.getElementById('boost-btn');
+            const refillPanel = document.getElementById('refill-panel');
+            
+            // Close refill panel if open
+            if (!refillPanel.classList.contains('hidden')) {
+                refillPanel.classList.add('hidden');
+            }
+            
             if (panel.classList.contains('hidden')) {
                 panel.classList.remove('hidden');
                 btn.innerText = "🚀 BOOSTS ▲";
@@ -249,8 +282,49 @@
             }
         }
         
-        function inviteFriends() {
-            // Try multiple ways to get user ID
+        function toggleRefills() {
+            const panel = document.getElementById('refill-panel');
+            const boostPanel = document.getElementById('boost-panel');
+            const boostBtn = document.getElementById('boost-btn');
+            
+            // Close boost panel if open
+            if (!boostPanel.classList.contains('hidden')) {
+                boostPanel.classList.add('hidden');
+                boostBtn.innerText = "🚀 BOOSTS";
+            }
+            
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                // Fetch current refill count from bot
+                fetchRefillCount();
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+        
+        function fetchRefillCount() {
+            // For now, show "?" and user needs to check /boosts
+            // In a real implementation, we'd query the bot's API
+            document.getElementById('refill-count').innerText = "?";
+            document.getElementById('refill-count').style.opacity = "0.5";
+            
+            const infoText = document.createElement('div');
+            infoText.style.cssText = "color: #f39c12; font-size: 0.85rem; margin-top: 10px;";
+            infoText.innerText = "💡 Use /boosts command in chat to see your exact count";
+            
+            const refillInfo = document.querySelector('.refill-info');
+            const existingInfo = refillInfo.querySelector('div[style*="f39c12"]');
+            if (!existingInfo) {
+                refillInfo.insertBefore(infoText, refillInfo.children[2]);
+            }
+        }
+        
+        function useRefillFromPanel() {
+            toggleRefills();
+            useEnergyBoost();
+        }
+        
+        function shareInviteFromPanel() {
             const userId = tg.initDataUnsafe?.user?.id || 
                           window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
             
@@ -263,7 +337,6 @@
             const inviteLink = `https://t.me/${botUsername}?start=ref_${userId}`;
             const shareText = `🎮 Play Bert Tap Attack and earn rewards!\n\n🎁 Use my invite link to get started!`;
             
-            // Use Telegram's share function
             const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
             tg.openLink(shareUrl);
         }
@@ -277,7 +350,7 @@
                 return;
             }
             
-            const btn = document.getElementById('refill-btn');
+            const btn = document.getElementById('use-refill-btn');
             btn.innerText = "⏳ USING...";
             btn.disabled = true;
             
@@ -293,9 +366,11 @@
             setTimeout(() => {
                 try {
                     tg.sendData(dataToSend);
+                    btn.innerText = "⚡ USE REFILL NOW";
+                    btn.disabled = false;
                 } catch (e) {
                     console.error('Boost error:', e);
-                    btn.innerText = "⚡ REFILL";
+                    btn.innerText = "⚡ USE REFILL NOW";
                     btn.disabled = false;
                 }
             }, 500);
@@ -304,12 +379,12 @@
         function buyBoost(type) {
             const cost = getBoostCost(type);
             
-            if (totalTaps < cost) {
-                tg.showAlert(`Not enough taps! You need ${cost.toLocaleString()} taps.`);
+            if (score < cost) {
+                tg.showAlert(`Not enough coins! You need ${cost.toLocaleString()} coins.`);
                 return;
             }
             
-            totalTaps -= cost;
+            score -= cost;
             
             if (type === 'tap') {
                 tapPowerLevel++;
@@ -329,10 +404,10 @@
             }
             
             // Save boosts
+            tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
             tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
-            tg.CloudStorage.setItem('totalTaps', String(totalTaps));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
