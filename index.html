@@ -14,10 +14,9 @@
             justify-content: space-between; overflow: hidden; touch-action: manipulation;
         }
         #header { padding-top: 20px; }
-        #coin-icon { width: 100px; height: 100px; margin-bottom: 10px; animation: float 3s ease-in-out infinite; }
+        #coin-icon { width: 120px; height: 120px; margin-bottom: 10px; animation: float 3s ease-in-out infinite; }
         @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
         #score { font-size: 3.5rem; font-weight: bold; text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); margin: 10px 0; }
-        #tap-counter { font-size: 0.9rem; color: #f1c40f; margin-top: 5px; }
         #game-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         #face { width: 98vw; cursor: pointer; transition: transform 0.1s; user-select: none; }
         #face:active { transform: scale(0.92); }
@@ -30,6 +29,13 @@
         .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 16px 30px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 1.1rem; cursor: pointer; transition: all 0.3s; }
         .btn:active { transform: scale(0.95); }
         .btn:disabled { opacity: 0.6; }
+        .btn-small { padding: 12px 20px; font-size: 0.95rem; width: auto; min-width: 150px; }
+        .boost-panel { background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; }
+        .boost-item { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .boost-info { text-align: left; flex: 1; }
+        .boost-name { font-weight: bold; color: #f1c40f; font-size: 1rem; }
+        .boost-cost { color: #bbb; font-size: 0.85rem; }
+        .boost-level { color: #3498db; font-size: 0.85rem; }
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; z-index: 1000; font-size: 1.5rem; }
         .hidden { display: none !important; }
     </style>
@@ -39,12 +45,40 @@
     <div id="header">
         <img src="coin.png" id="coin-icon">
         <div id="score">0</div>
-        <div id="tap-counter">Total Taps: 0</div>
     </div>
     <div id="game-area"><img id="face" src="face.png"></div>
     <div class="footer">
-        <div id="energy-label">Energy: <span id="e-val">100</span>/100</div>
+        <div id="energy-label">Energy: <span id="e-val">1000</span>/1000</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
+        
+        <div id="boost-panel" class="boost-panel hidden">
+            <div class="boost-item">
+                <div class="boost-info">
+                    <div class="boost-name">⚡ Tap Power</div>
+                    <div class="boost-cost">Cost: <span id="tap-cost">100</span> taps</div>
+                    <div class="boost-level">Level: <span id="tap-level">1</span></div>
+                </div>
+                <button class="btn btn-small" onclick="buyBoost('tap')">BUY</button>
+            </div>
+            <div class="boost-item">
+                <div class="boost-info">
+                    <div class="boost-name">🔋 Max Energy</div>
+                    <div class="boost-cost">Cost: <span id="energy-cost">500</span> taps</div>
+                    <div class="boost-level">Level: <span id="energy-level">1</span></div>
+                </div>
+                <button class="btn btn-small" onclick="buyBoost('energy')">BUY</button>
+            </div>
+            <div class="boost-item">
+                <div class="boost-info">
+                    <div class="boost-name">⚡ Energy Regen</div>
+                    <div class="boost-cost">Cost: <span id="regen-cost">300</span> taps</div>
+                    <div class="boost-level">Level: <span id="regen-level">1</span></div>
+                </div>
+                <button class="btn btn-small" onclick="buyBoost('regen')">BUY</button>
+            </div>
+        </div>
+        
+        <button class="btn" id="boost-btn" onclick="toggleBoosts()">🚀 BOOSTS</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 SYNC & RANK</button>
     </div>
     <script>
@@ -52,15 +86,57 @@
         tg.ready(); 
         tg.expand();
         
-        let score = 0, tapPower = 1, energy = 100, totalTaps = 0, isLoading = true;
+        let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
+        const MAX_ENERGY = 1000;
+        
+        // Boost system
+        let tapPowerLevel = 1;
+        let maxEnergyLevel = 1;
+        let energyRegenLevel = 1;
+        
+        function getMaxEnergy() {
+            return 1000 + (maxEnergyLevel - 1) * 500;
+        }
+        
+        function getEnergyRegen() {
+            return 10 + (energyRegenLevel - 1) * 5;
+        }
+        
+        function getTapPower() {
+            return tapPowerLevel;
+        }
+        
+        function getBoostCost(type) {
+            if (type === 'tap') return 100 * Math.pow(2, tapPowerLevel - 1);
+            if (type === 'energy') return 500 * Math.pow(2, maxEnergyLevel - 1);
+            if (type === 'regen') return 300 * Math.pow(2, energyRegenLevel - 1);
+            return 0;
+        }
         
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel'], (err, values) => {
             if (!err && values) {
                 score = parseInt(values.score) || 0;
-                tapPower = parseInt(values.tapPower) || 1;
                 totalTaps = parseInt(values.totalTaps) || 0;
-                energy = parseInt(values.energy) || 100;
+                energy = parseInt(values.energy) || 1000;
+                
+                // Load boost levels
+                tapPowerLevel = parseInt(values.tapPowerLevel) || 1;
+                maxEnergyLevel = parseInt(values.maxEnergyLevel) || 1;
+                energyRegenLevel = parseInt(values.energyRegenLevel) || 1;
+                
+                // Apply boosts
+                tapPower = getTapPower();
+                energy = Math.min(energy, getMaxEnergy());
+                
+                // Update boost UI
+                document.getElementById('tap-level').innerText = tapPowerLevel;
+                document.getElementById('energy-level').innerText = maxEnergyLevel;
+                document.getElementById('regen-level').innerText = energyRegenLevel;
+                document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
+                document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
+                document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
+                document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
             }
             updateUI();
             isLoading = false;
@@ -77,14 +153,16 @@
         
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
-            document.getElementById('e-val').innerText = Math.floor(energy);
-            document.getElementById('energy-bar').style.width = energy + "%";
-            document.getElementById('tap-counter').innerText = `Total Taps: ${totalTaps.toLocaleString()}`;
+            const eVal = document.getElementById('e-val');
+            if (eVal) eVal.innerText = Math.floor(energy);
+            const maxEnergy = getMaxEnergy();
+            document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
         }
         
         setInterval(() => { 
-            if (energy < 100) { 
-                energy = Math.min(100, energy + 1);
+            const maxEnergy = getMaxEnergy();
+            if (energy < maxEnergy) { 
+                energy = Math.min(maxEnergy, energy + getEnergyRegen());
                 updateUI(); 
             } 
         }, 1000);
@@ -95,6 +173,9 @@
                 tg.CloudStorage.setItem('tapPower', String(tapPower));
                 tg.CloudStorage.setItem('totalTaps', String(totalTaps));
                 tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
+                tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+                tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
+                tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             } 
         }, 30000);
         
@@ -120,6 +201,55 @@
             }
         });
         
+        function toggleBoosts() {
+            const panel = document.getElementById('boost-panel');
+            const btn = document.getElementById('boost-btn');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                btn.innerText = "❌ CLOSE";
+            } else {
+                panel.classList.add('hidden');
+                btn.innerText = "🚀 BOOSTS";
+            }
+        }
+        
+        function buyBoost(type) {
+            const cost = getBoostCost(type);
+            
+            if (totalTaps < cost) {
+                tg.showAlert(`Not enough taps! You need ${cost.toLocaleString()} taps.`);
+                return;
+            }
+            
+            totalTaps -= cost;
+            
+            if (type === 'tap') {
+                tapPowerLevel++;
+                tapPower = getTapPower();
+                document.getElementById('tap-level').innerText = tapPowerLevel;
+                document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
+            } else if (type === 'energy') {
+                maxEnergyLevel++;
+                energy = Math.min(energy, getMaxEnergy());
+                document.getElementById('energy-level').innerText = maxEnergyLevel;
+                document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
+                document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
+            } else if (type === 'regen') {
+                energyRegenLevel++;
+                document.getElementById('regen-level').innerText = energyRegenLevel;
+                document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
+            }
+            
+            // Save boosts
+            tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+            tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
+            tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+            tg.CloudStorage.setItem('totalTaps', String(totalTaps));
+            
+            tg.HapticFeedback.notificationOccurred('success');
+            updateUI();
+        }
+        
         function syncAndRank() {
             const btn = document.getElementById('sync-btn');
             if (isLoading || btn.disabled) return;
@@ -132,6 +262,9 @@
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
             tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
+            tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+            tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
+            tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -162,6 +295,9 @@
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
             tg.CloudStorage.setItem('energy', String(Math.floor(energy)));
+            tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+            tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
+            tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
         });
     </script>
 </body>
