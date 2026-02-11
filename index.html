@@ -183,6 +183,10 @@
         let suspiciousActivityCount = 0;
         let isFlagged = false;
         
+        // Position-based anti-cheat (prevent same-spot auto-clickers)
+        let lastTapPositions = []; // Track last 2 tap positions
+        const MAX_SAME_POSITION_TAPS = 2; // Only allow 2 consecutive taps in same spot
+        
         // Boost system
         let tapPowerLevel = 1;
         let maxEnergyLevel = 1;
@@ -221,7 +225,10 @@
         }
         
         function getEnergyRegenRate() {
-            return 1 + energyRegenLevel; // Base 1/sec + boost levels
+            // Much more subtle: Base 1/sec + 0.2/sec per level
+            // Level 1 = 1.2/sec, Level 5 = 2.0/sec, Level 10 = 3.0/sec
+            // This prevents infinite tapping even at high levels
+            return 1 + (energyRegenLevel * 0.2);
         }
         
         function processOfflineProgress(lastTime) {
@@ -454,6 +461,36 @@
                                 }
                             }
                         }
+                    }
+                    
+                    // === LAYER 4: Same-Position Detection ===
+                    // Track tap position to detect auto-clickers stuck in one spot
+                    const tapX = Math.round(e.clientX);
+                    const tapY = Math.round(e.clientY);
+                    const currentPosition = `${tapX},${tapY}`;
+                    
+                    // Check if last 2 taps were in exact same position
+                    if (lastTapPositions.length >= MAX_SAME_POSITION_TAPS) {
+                        const allSamePosition = lastTapPositions.every(pos => pos === currentPosition);
+                        
+                        if (allSamePosition) {
+                            suspiciousActivityCount += 2;
+                            tg.HapticFeedback.notificationOccurred('error');
+                            tg.showAlert("⚠️ Same position detected!\n\nMove your finger around the screen.");
+                            
+                            if (suspiciousActivityCount >= 4) {
+                                isFlagged = true;
+                                score = 0;
+                                tg.showAlert("🚫 AUTO-CLICKER DETECTED!\n\nTapping in exact same spot repeatedly.\n\nYour account has been flagged.\nScore reset to zero.");
+                            }
+                            return;
+                        }
+                    }
+                    
+                    // Update position tracking (keep last 2 positions)
+                    lastTapPositions.push(currentPosition);
+                    if (lastTapPositions.length > MAX_SAME_POSITION_TAPS) {
+                        lastTapPositions.shift();
                     }
                     
                     // Decay suspicious activity counter over time (forgive minor issues)
