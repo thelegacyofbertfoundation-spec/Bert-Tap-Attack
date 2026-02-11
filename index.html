@@ -670,18 +670,23 @@
                     }
                     
                     // === LAYER 5: Repeating Pattern Detection ===
+                    // DISABLED - Too many false positives with multi-finger tapping
                     // Track positions for pattern analysis
                     tapPositionHistory.push(currentPosition);
                     if (tapPositionHistory.length > PATTERN_HISTORY_SIZE) {
                         tapPositionHistory.shift();
                     }
                     
-                    // Check for repeating patterns (macros/bots following a sequence)
+                    // Pattern detection disabled - causes false positives with:
+                    // - Two-finger tapping (creates natural A-B-A-B pattern)
+                    // - Thumb tapping (natural tendency to alternate spots)
+                    // - Fast tapping (naturally creates patterns)
+                    
+                    /* PATTERN DETECTION DISABLED
                     if (tapPositionHistory.length >= MIN_PATTERN_LENGTH * 2) {
                         if (detectRepeatingPattern(tapPositionHistory)) {
                             suspiciousActivityCount += 3;
                             
-                            // Only flag after 9 violations (not 3)
                             if (suspiciousActivityCount >= 9) {
                                 isFlagged = true;
                                 score = 0;
@@ -691,6 +696,7 @@
                             }
                         }
                     }
+                    */
                     
                     // Aggressive forgiveness system - decay suspicious activity counter
                     // 30% chance per tap to reduce counter (increased from 10%)
