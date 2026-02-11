@@ -14,11 +14,15 @@
             justify-content: space-between; overflow: hidden; touch-action: manipulation;
         }
         #header { padding-top: 20px; position: relative; }
-        #boost-timer-container { width: 200px; margin: 0 auto 10px; }
-        #boost-timer-label { font-size: 0.7rem; color: #bbb; text-align: center; margin-bottom: 3px; }
-        #boost-timer-bar-bg { width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
-        #boost-timer-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #e67e22 0%, #f39c12 100%); transition: width 0.3s; }
-        #unlocks-btn { position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
+        #boost-timer-container { width: 220px; margin: 0 auto 10px; }
+        .boost-timer-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+        .boost-timer-label { font-size: 0.65rem; color: #bbb; min-width: 50px; }
+        .boost-timer-bar-wrapper { flex: 1; }
+        .boost-timer-bar-bg { width: 100%; height: 6px; background: #333; border-radius: 3px; overflow: hidden; border: 1px solid #555; }
+        .boost-timer-bar { width: 100%; height: 100%; transition: width 0.3s; }
+        .tap-timer-bar { background: linear-gradient(90deg, #e67e22 0%, #f39c12 100%); }
+        .regen-timer-bar { background: linear-gradient(90deg, #3498db 0%, #2ecc71 100%); }
+        #unlocks-btn { position: absolute; top: 60px; right: 20px; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
         #unlocks-btn:active { transform: scale(0.95); }
         .unlocks-panel { background: rgba(0, 0, 0, 0.95); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; top: 70px; left: 50%; transform: translateX(-50%); box-shadow: 0 5px 20px rgba(0,0,0,0.5); border: 2px solid #9b59b6; z-index: 100; max-height: 70vh; overflow-y: auto; }
         .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
@@ -49,7 +53,7 @@
         #energy-label { font-size: 0.85rem; color: #bbb; margin-bottom: 5px; }
         #energy-container { width: 90%; max-width: 400px; background: #333; height: 14px; border-radius: 10px; overflow: hidden; border: 2px solid #444; }
         #energy-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f39c12 0%, #f1c40f 100%); transition: width 0.2s; }
-        .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 16px 30px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 1.1rem; cursor: pointer; transition: all 0.3s; }
+        .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 14px 20px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; }
         .btn:active { transform: scale(0.95); }
         .btn:disabled { opacity: 0.6; }
         .btn-small { padding: 12px 20px; font-size: 0.95rem; width: auto; min-width: 150px; }
@@ -98,9 +102,23 @@
         </div>
         
         <div id="boost-timer-container">
-            <div id="boost-timer-label">Boost Timer: <span id="boost-timer-text">4:00:00</span></div>
-            <div id="boost-timer-bar-bg">
-                <div id="boost-timer-bar"></div>
+            <div class="boost-timer-row">
+                <div class="boost-timer-label">⚡ Tap:</div>
+                <div class="boost-timer-bar-wrapper">
+                    <div class="boost-timer-bar-bg">
+                        <div id="tap-timer-bar" class="boost-timer-bar tap-timer-bar"></div>
+                    </div>
+                </div>
+                <div class="boost-timer-label" id="tap-timer-text">4:00</div>
+            </div>
+            <div class="boost-timer-row">
+                <div class="boost-timer-label">⚡ Regen:</div>
+                <div class="boost-timer-bar-wrapper">
+                    <div class="boost-timer-bar-bg">
+                        <div id="regen-timer-bar" class="boost-timer-bar regen-timer-bar"></div>
+                    </div>
+                </div>
+                <div class="boost-timer-label" id="regen-timer-text">4:00</div>
             </div>
         </div>
         
@@ -178,7 +196,7 @@
         tg.expand();
         
         // Game version - increment this to reset everyone's boost levels
-        const GAME_VERSION = 3; // Changed from 2 - triggers full reset
+        const GAME_VERSION = 4; // Changed from 3 - triggers full reset
         
         let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
         const MAX_ENERGY = 1000;
@@ -212,7 +230,9 @@
         let maxEnergyLevel = 1;
         let energyRegenLevel = 1;
         let lastSaveTime = Date.now(); // Track when game was last saved
-        let lastBoostCheckTime = Date.now(); // Track for boost deterioration
+        let lastTapPowerCheckTime = Date.now(); // Track tap power deterioration
+        let lastEnergyRegenCheckTime = Date.now(); // Track energy regen deterioration
+        // Note: Max Energy doesn't deteriorate separately, only the other two
         
         // Card unlock system
         let unlockedCards = []; // Array of unlocked card IDs
@@ -343,7 +363,7 @@
         }
         
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime', 'lastBoostCheckTime'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime', 'lastTapPowerCheckTime', 'lastEnergyRegenCheckTime'], (err, values) => {
             if (!err && values) {
                 const savedVersion = parseInt(values.gameVersion) || 1;
                 
@@ -387,18 +407,20 @@
                     
                     // Process offline progress (energy regen + boost deterioration)
                     const savedTime = parseInt(values.lastSaveTime) || Date.now();
-                    const savedBoostTime = parseInt(values.lastBoostCheckTime) || Date.now();
+                    const savedTapTime = parseInt(values.lastTapPowerCheckTime) || Date.now();
+                    const savedRegenTime = parseInt(values.lastEnergyRegenCheckTime) || Date.now();
                     if (savedTime < Date.now() - 5000) { // Only if away for more than 5 seconds
                         processOfflineProgress(savedTime);
                     }
                     
-                    // Load boost check time (for timer display)
-                    lastBoostCheckTime = savedBoostTime;
+                    // Load boost check times (for timer display)
+                    lastTapPowerCheckTime = savedTapTime;
+                    lastEnergyRegenCheckTime = savedRegenTime;
                 }
                 
                 // Update current save time
                 lastSaveTime = Date.now();
-                // Don't reset lastBoostCheckTime here - it should persist
+                // Don't reset timer check times here - they should persist
                 
                 // Apply boosts
                 tapPower = getTapPower();
@@ -439,73 +461,74 @@
         
         function updateBoostTimer() {
             const now = Date.now();
-            const timeSinceLastCheck = now - lastBoostCheckTime;
             const fourHoursInMs = BOOST_DETERIORATION_HOURS * 60 * 60 * 1000;
-            const timeRemaining = Math.max(0, fourHoursInMs - timeSinceLastCheck);
             
-            // Calculate percentage for progress bar
-            const percentage = (timeRemaining / fourHoursInMs) * 100;
+            // === TAP POWER TIMER ===
+            const tapTimeSinceCheck = now - lastTapPowerCheckTime;
+            const tapTimeRemaining = Math.max(0, fourHoursInMs - tapTimeSinceCheck);
+            const tapPercentage = (tapTimeRemaining / fourHoursInMs) * 100;
             
-            // Update bar width
-            const bar = document.getElementById('boost-timer-bar');
-            if (bar) {
-                bar.style.width = percentage + '%';
+            const tapBar = document.getElementById('tap-timer-bar');
+            if (tapBar) {
+                tapBar.style.width = tapPercentage + '%';
             }
             
-            // Update time text (HH:MM:SS)
-            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-            
-            const timeText = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            const label = document.getElementById('boost-timer-text');
-            if (label) {
-                label.innerText = timeText;
+            const tapMinutes = Math.floor(tapTimeRemaining / (1000 * 60));
+            const tapSeconds = Math.floor((tapTimeRemaining % (1000 * 60)) / 1000);
+            const tapTimeText = `${tapMinutes}:${String(tapSeconds).padStart(2, '0')}`;
+            const tapLabel = document.getElementById('tap-timer-text');
+            if (tapLabel) {
+                tapLabel.innerText = tapTimeText;
             }
             
-            // Check if time expired (deterioration should happen)
-            if (timeRemaining === 0 && (tapPowerLevel > 1 || maxEnergyLevel > 1 || energyRegenLevel > 1)) {
-                // Deteriorate boosts
-                let deteriorated = false;
+            // Check if tap power timer expired
+            if (tapTimeRemaining === 0 && tapPowerLevel > 1) {
+                tapPowerLevel = Math.max(1, tapPowerLevel - 1);
+                lastTapPowerCheckTime = Date.now();
+                tapPower = getTapPower();
                 
-                if (tapPowerLevel > 1) {
-                    tapPowerLevel = Math.max(1, tapPowerLevel - 1);
-                    deteriorated = true;
-                }
-                if (maxEnergyLevel > 1) {
-                    maxEnergyLevel = Math.max(1, maxEnergyLevel - 1);
-                    deteriorated = true;
-                }
-                if (energyRegenLevel > 1) {
-                    energyRegenLevel = Math.max(1, energyRegenLevel - 1);
-                    deteriorated = true;
-                }
+                document.getElementById('tap-level').innerText = tapPowerLevel;
+                document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
                 
-                if (deteriorated) {
-                    // Reset timer
-                    lastBoostCheckTime = Date.now();
-                    
-                    // Re-apply boost calculations
-                    tapPower = getTapPower();
-                    energy = Math.min(energy, getMaxEnergy());
-                    
-                    // Update UI
-                    document.getElementById('tap-level').innerText = tapPowerLevel;
-                    document.getElementById('energy-level').innerText = maxEnergyLevel;
-                    document.getElementById('regen-level').innerText = energyRegenLevel;
-                    document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
-                    document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
-                    document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
-                    
-                    tg.showAlert("⚠️ Boost Deteriorated!\n\nYour boosts dropped by 1 level.\n\nKeep playing to maintain them!");
-                    
-                    // Save changes
-                    tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
-                    tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
-                    tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
-                    tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
-                }
+                tg.showAlert("⚠️ Tap Power Deteriorated!\n\nTap Power dropped by 1 level.");
+                
+                tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+                tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
             }
+            
+            // === ENERGY REGEN TIMER ===
+            const regenTimeSinceCheck = now - lastEnergyRegenCheckTime;
+            const regenTimeRemaining = Math.max(0, fourHoursInMs - regenTimeSinceCheck);
+            const regenPercentage = (regenTimeRemaining / fourHoursInMs) * 100;
+            
+            const regenBar = document.getElementById('regen-timer-bar');
+            if (regenBar) {
+                regenBar.style.width = regenPercentage + '%';
+            }
+            
+            const regenMinutes = Math.floor(regenTimeRemaining / (1000 * 60));
+            const regenSeconds = Math.floor((regenTimeRemaining % (1000 * 60)) / 1000);
+            const regenTimeText = `${regenMinutes}:${String(regenSeconds).padStart(2, '0')}`;
+            const regenLabel = document.getElementById('regen-timer-text');
+            if (regenLabel) {
+                regenLabel.innerText = regenTimeText;
+            }
+            
+            // Check if energy regen timer expired
+            if (regenTimeRemaining === 0 && energyRegenLevel > 1) {
+                energyRegenLevel = Math.max(1, energyRegenLevel - 1);
+                lastEnergyRegenCheckTime = Date.now();
+                
+                document.getElementById('regen-level').innerText = energyRegenLevel;
+                document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
+                
+                tg.showAlert("⚠️ Energy Regen Deteriorated!\n\nEnergy Regen dropped by 1 level.");
+                
+                tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+                tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
+            }
+            
+            // Note: Max Energy deteriorates with offline progress only, not with timer
         }
         
         // Update boost timer every second
@@ -532,7 +555,8 @@
                 tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
                 tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
                 tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
-                tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+                tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
+                tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
             } 
         }, 30000);
         
@@ -799,7 +823,8 @@
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
-            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+            tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
+            tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
             
             // Update UI
             updateUI();
@@ -975,20 +1000,22 @@
                 tapPower = getTapPower();
                 document.getElementById('tap-level').innerText = tapPowerLevel;
                 document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
+                // Reset tap power timer when buying tap boost
+                lastTapPowerCheckTime = Date.now();
             } else if (type === 'energy') {
                 maxEnergyLevel++;
                 energy = Math.min(energy, getMaxEnergy());
                 document.getElementById('energy-level').innerText = maxEnergyLevel;
                 document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
                 document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
+                // Max energy doesn't have a separate timer
             } else if (type === 'regen') {
                 energyRegenLevel++;
                 document.getElementById('regen-level').innerText = energyRegenLevel;
                 document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
+                // Reset energy regen timer when buying regen boost
+                lastEnergyRegenCheckTime = Date.now();
             }
-            
-            // Reset deterioration timer when buying boost
-            lastBoostCheckTime = Date.now();
             
             // Save boosts
             tg.CloudStorage.setItem('score', String(score));
@@ -998,7 +1025,8 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(Date.now()));
-            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+            tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
+            tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
@@ -1024,7 +1052,8 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
-            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+            tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
+            tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -1064,7 +1093,8 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
-            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+            tg.CloudStorage.setItem('lastTapPowerCheckTime', String(lastTapPowerCheckTime));
+            tg.CloudStorage.setItem('lastEnergyRegenCheckTime', String(lastEnergyRegenCheckTime));
         });
     </script>
 </body>
