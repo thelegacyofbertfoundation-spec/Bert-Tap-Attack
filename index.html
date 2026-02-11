@@ -14,11 +14,12 @@
             justify-content: space-between; overflow: hidden; touch-action: manipulation;
         }
         #header { padding-top: 20px; position: relative; }
-        #boost-timer-container { width: 240px; margin: 0 auto 15px; }
-        .boost-timer-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-        .boost-timer-label { font-size: 0.75rem; color: #bbb; min-width: 55px; font-weight: 500; }
-        .boost-timer-label:last-child { min-width: 45px; text-align: right; color: #f39c12; font-weight: bold; }
-        .boost-timer-bar-wrapper { flex: 1; }
+        #boost-timer-container { position: absolute; top: 20px; left: 10px; width: 180px; }
+        .boost-timer-row { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+        .boost-timer-label { font-size: 0.7rem; color: #bbb; font-weight: 500; }
+        .boost-timer-label:first-child { min-width: 45px; }
+        .boost-timer-label:last-child { min-width: 38px; text-align: right; color: #f39c12; font-weight: bold; }
+        .boost-timer-bar-wrapper { width: 80px; }
         .boost-timer-bar-bg { width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
         .boost-timer-bar { width: 100%; height: 100%; transition: width 0.3s; }
         .tap-timer-bar { background: linear-gradient(90deg, #e67e22 0%, #f39c12 100%); }
@@ -51,7 +52,6 @@
         .tap-effect { position: absolute; color: #f1c40f; font-weight: bold; font-size: 1.5rem; pointer-events: none; animation: floatUp 1s ease-out forwards; }
         @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
         .footer { padding: 20px 20px 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; background: rgba(0, 0, 0, 0.3); position: relative; }
-        #energy-label { font-size: 0.85rem; color: #bbb; margin-bottom: 5px; }
         #energy-container { width: 90%; max-width: 400px; background: #333; height: 14px; border-radius: 10px; overflow: hidden; border: 2px solid #444; }
         #energy-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f39c12 0%, #f1c40f 100%); transition: width 0.2s; }
         .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 12px 16px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 0.85rem; cursor: pointer; transition: all 0.3s; }
@@ -194,7 +194,6 @@
             </div>
         </div>
         
-        <div id="energy-label">Energy: <span id="e-val">1000</span>/1000</div>
         <div id="energy-container"><div id="energy-bar"></div></div>
         
         <button class="btn" id="boost-btn" onclick="toggleBoosts()">🚀 BOOSTS</button>
@@ -515,7 +514,6 @@
                 document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
                 document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
                 document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
-                document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
             } else {
                 // First time player - set version
                 tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
@@ -535,8 +533,6 @@
         
         function updateUI() {
             document.getElementById('score').innerText = score.toLocaleString();
-            const eVal = document.getElementById('e-val');
-            if (eVal) eVal.innerText = Math.floor(energy);
             const maxEnergy = getMaxEnergy();
             document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
         }
@@ -555,9 +551,9 @@
                 tapBar.style.width = tapPercentage + '%';
             }
             
-            const tapMinutes = Math.floor(tapTimeRemaining / (1000 * 60));
-            const tapSeconds = Math.floor((tapTimeRemaining % (1000 * 60)) / 1000);
-            const tapTimeText = `${tapMinutes}:${String(tapSeconds).padStart(2, '0')}`;
+            const tapHours = Math.floor(tapTimeRemaining / (1000 * 60 * 60));
+            const tapMinutes = Math.floor((tapTimeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            const tapTimeText = `${tapHours}:${String(tapMinutes).padStart(2, '0')}`;
             const tapLabel = document.getElementById('tap-timer-text');
             if (tapLabel) {
                 tapLabel.innerText = tapTimeText;
@@ -589,9 +585,9 @@
                 regenBar.style.width = regenPercentage + '%';
             }
             
-            const regenMinutes = Math.floor(regenTimeRemaining / (1000 * 60));
-            const regenSeconds = Math.floor((regenTimeRemaining % (1000 * 60)) / 1000);
-            const regenTimeText = `${regenMinutes}:${String(regenSeconds).padStart(2, '0')}`;
+            const regenHours = Math.floor(regenTimeRemaining / (1000 * 60 * 60));
+            const regenMinutes = Math.floor((regenTimeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            const regenTimeText = `${regenHours}:${String(regenMinutes).padStart(2, '0')}`;
             const regenLabel = document.getElementById('regen-timer-text');
             if (regenLabel) {
                 regenLabel.innerText = regenTimeText;
@@ -1117,7 +1113,6 @@
                 energy = Math.min(energy, getMaxEnergy());
                 document.getElementById('energy-level').innerText = maxEnergyLevel;
                 document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
-                document.getElementById('energy-label').innerHTML = `Energy: <span id="e-val">${Math.floor(energy)}</span>/${getMaxEnergy()}`;
                 // Max energy doesn't have a separate timer
             } else if (type === 'regen') {
                 energyRegenLevel++;
