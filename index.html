@@ -14,6 +14,10 @@
             justify-content: space-between; overflow: hidden; touch-action: manipulation;
         }
         #header { padding-top: 20px; position: relative; }
+        #boost-timer-container { width: 200px; margin: 0 auto 10px; }
+        #boost-timer-label { font-size: 0.7rem; color: #bbb; text-align: center; margin-bottom: 3px; }
+        #boost-timer-bar-bg { width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
+        #boost-timer-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #e67e22 0%, #f39c12 100%); transition: width 0.3s; }
         #unlocks-btn { position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
         #unlocks-btn:active { transform: scale(0.95); }
         .unlocks-panel { background: rgba(0, 0, 0, 0.95); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; margin-bottom: 10px; position: absolute; top: 70px; left: 50%; transform: translateX(-50%); box-shadow: 0 5px 20px rgba(0,0,0,0.5); border: 2px solid #9b59b6; z-index: 100; max-height: 70vh; overflow-y: auto; }
@@ -90,6 +94,13 @@
                 </div>
                 
                 <!-- More cards will be added here -->
+            </div>
+        </div>
+        
+        <div id="boost-timer-container">
+            <div id="boost-timer-label">Boost Timer: <span id="boost-timer-text">4:00:00</span></div>
+            <div id="boost-timer-bar-bg">
+                <div id="boost-timer-bar"></div>
             </div>
         </div>
         
@@ -184,8 +195,14 @@
         let isFlagged = false;
         
         // Position-based anti-cheat (prevent same-spot auto-clickers)
-        let lastTapPositions = []; // Track last 2 tap positions
+        let lastTapPositions = []; // Track last 2 tap positions for same-spot detection
         const MAX_SAME_POSITION_TAPS = 2; // Only allow 2 consecutive taps in same spot
+        
+        // Pattern detection (detect repeating sequences)
+        let tapPositionHistory = []; // Track last 20 positions for pattern analysis
+        const PATTERN_HISTORY_SIZE = 20;
+        const MIN_PATTERN_LENGTH = 3; // Minimum sequence length to detect
+        const MAX_PATTERN_LENGTH = 8; // Maximum sequence length to check
         
         // Face animation
         let currentFace = 'face.png'; // Track which face is showing
@@ -286,8 +303,47 @@
             };
         }
         
+        function detectRepeatingPattern(positions) {
+            // Check if tap positions form a repeating pattern (like a macro/bot sequence)
+            if (positions.length < MIN_PATTERN_LENGTH * 2) {
+                return false; // Not enough data
+            }
+            
+            // Try different pattern lengths (3, 4, 5, 6, 7, 8 positions)
+            for (let patternLen = MIN_PATTERN_LENGTH; patternLen <= MAX_PATTERN_LENGTH; patternLen++) {
+                if (positions.length < patternLen * 2) continue;
+                
+                // Get the last N positions as potential pattern
+                const recentPattern = positions.slice(-patternLen);
+                
+                // Check if this pattern repeats in the previous positions
+                const previousSegment = positions.slice(-patternLen * 2, -patternLen);
+                
+                // Compare the two segments
+                let matchCount = 0;
+                for (let i = 0; i < patternLen; i++) {
+                    // Allow small position variance (within 5 pixels)
+                    const [x1, y1] = recentPattern[i].split(',').map(Number);
+                    const [x2, y2] = previousSegment[i].split(',').map(Number);
+                    
+                    const distance = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+                    
+                    if (distance < 5) { // Within 5 pixels = same position
+                        matchCount++;
+                    }
+                }
+                
+                // If 80% or more positions match, it's a repeating pattern
+                if (matchCount >= patternLen * 0.8) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime', 'lastBoostCheckTime'], (err, values) => {
             if (!err && values) {
                 const savedVersion = parseInt(values.gameVersion) || 1;
                 
@@ -331,14 +387,18 @@
                     
                     // Process offline progress (energy regen + boost deterioration)
                     const savedTime = parseInt(values.lastSaveTime) || Date.now();
+                    const savedBoostTime = parseInt(values.lastBoostCheckTime) || Date.now();
                     if (savedTime < Date.now() - 5000) { // Only if away for more than 5 seconds
                         processOfflineProgress(savedTime);
                     }
+                    
+                    // Load boost check time (for timer display)
+                    lastBoostCheckTime = savedBoostTime;
                 }
                 
-                // Update current time
+                // Update current save time
                 lastSaveTime = Date.now();
-                lastBoostCheckTime = Date.now();
+                // Don't reset lastBoostCheckTime here - it should persist
                 
                 // Apply boosts
                 tapPower = getTapPower();
@@ -377,6 +437,80 @@
             document.getElementById('energy-bar').style.width = (energy / maxEnergy * 100) + "%";
         }
         
+        function updateBoostTimer() {
+            const now = Date.now();
+            const timeSinceLastCheck = now - lastBoostCheckTime;
+            const fourHoursInMs = BOOST_DETERIORATION_HOURS * 60 * 60 * 1000;
+            const timeRemaining = Math.max(0, fourHoursInMs - timeSinceLastCheck);
+            
+            // Calculate percentage for progress bar
+            const percentage = (timeRemaining / fourHoursInMs) * 100;
+            
+            // Update bar width
+            const bar = document.getElementById('boost-timer-bar');
+            if (bar) {
+                bar.style.width = percentage + '%';
+            }
+            
+            // Update time text (HH:MM:SS)
+            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+            
+            const timeText = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const label = document.getElementById('boost-timer-text');
+            if (label) {
+                label.innerText = timeText;
+            }
+            
+            // Check if time expired (deterioration should happen)
+            if (timeRemaining === 0 && (tapPowerLevel > 1 || maxEnergyLevel > 1 || energyRegenLevel > 1)) {
+                // Deteriorate boosts
+                let deteriorated = false;
+                
+                if (tapPowerLevel > 1) {
+                    tapPowerLevel = Math.max(1, tapPowerLevel - 1);
+                    deteriorated = true;
+                }
+                if (maxEnergyLevel > 1) {
+                    maxEnergyLevel = Math.max(1, maxEnergyLevel - 1);
+                    deteriorated = true;
+                }
+                if (energyRegenLevel > 1) {
+                    energyRegenLevel = Math.max(1, energyRegenLevel - 1);
+                    deteriorated = true;
+                }
+                
+                if (deteriorated) {
+                    // Reset timer
+                    lastBoostCheckTime = Date.now();
+                    
+                    // Re-apply boost calculations
+                    tapPower = getTapPower();
+                    energy = Math.min(energy, getMaxEnergy());
+                    
+                    // Update UI
+                    document.getElementById('tap-level').innerText = tapPowerLevel;
+                    document.getElementById('energy-level').innerText = maxEnergyLevel;
+                    document.getElementById('regen-level').innerText = energyRegenLevel;
+                    document.getElementById('tap-cost').innerText = getBoostCost('tap').toLocaleString();
+                    document.getElementById('energy-cost').innerText = getBoostCost('energy').toLocaleString();
+                    document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
+                    
+                    tg.showAlert("⚠️ Boost Deteriorated!\n\nYour boosts dropped by 1 level.\n\nKeep playing to maintain them!");
+                    
+                    // Save changes
+                    tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
+                    tg.CloudStorage.setItem('maxEnergyLevel', String(maxEnergyLevel));
+                    tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
+                    tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
+                }
+            }
+        }
+        
+        // Update boost timer every second
+        setInterval(updateBoostTimer, 1000);
+        
         setInterval(() => { 
             const maxEnergy = getMaxEnergy();
             if (energy < maxEnergy) { 
@@ -398,6 +532,7 @@
                 tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
                 tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
                 tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
+                tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
             } 
         }, 30000);
         
@@ -494,6 +629,31 @@
                     lastTapPositions.push(currentPosition);
                     if (lastTapPositions.length > MAX_SAME_POSITION_TAPS) {
                         lastTapPositions.shift();
+                    }
+                    
+                    // === LAYER 5: Repeating Pattern Detection ===
+                    // Track positions for pattern analysis
+                    tapPositionHistory.push(currentPosition);
+                    if (tapPositionHistory.length > PATTERN_HISTORY_SIZE) {
+                        tapPositionHistory.shift();
+                    }
+                    
+                    // Check for repeating patterns (macros/bots following a sequence)
+                    if (tapPositionHistory.length >= MIN_PATTERN_LENGTH * 2) {
+                        if (detectRepeatingPattern(tapPositionHistory)) {
+                            suspiciousActivityCount += 3;
+                            tg.HapticFeedback.notificationOccurred('error');
+                            
+                            if (suspiciousActivityCount >= 3) {
+                                isFlagged = true;
+                                score = 0;
+                                tg.showAlert("🚫 MACRO PATTERN DETECTED!\n\nRepeating tap sequence detected.\n\nYour account has been flagged.\nScore reset to zero.");
+                                return;
+                            } else {
+                                tg.showAlert("⚠️ Suspicious pattern detected!\n\nVary your tap positions more.");
+                                return;
+                            }
+                        }
                     }
                     
                     // Decay suspicious activity counter over time (forgive minor issues)
@@ -639,6 +799,7 @@
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
+            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
             
             // Update UI
             updateUI();
@@ -837,6 +998,7 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(Date.now()));
+            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
@@ -862,6 +1024,7 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
+            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -901,6 +1064,7 @@
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
             tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
+            tg.CloudStorage.setItem('lastBoostCheckTime', String(lastBoostCheckTime));
         });
     </script>
 </body>
