@@ -187,6 +187,8 @@
         let tapPowerLevel = 1;
         let maxEnergyLevel = 1;
         let energyRegenLevel = 1;
+        let lastSaveTime = Date.now(); // Track when game was last saved
+        let lastBoostCheckTime = Date.now(); // Track for boost deterioration
         
         // Card unlock system
         let unlockedCards = []; // Array of unlocked card IDs
@@ -195,12 +197,16 @@
             // More cards can be added here later
         };
         
+        // Boost deterioration settings
+        const BOOST_DETERIORATION_HOURS = 4; // Boosts decay every 4 hours
+        const BOOST_LEVEL_CAP_WITHOUT_CARD = 5; // Max level without card unlock
+        
         function getMaxEnergy() {
             return 1000 + (maxEnergyLevel - 1) * 500;
         }
         
         function getEnergyRegen() {
-            return 1 + (energyRegenLevel - 1) * 1;
+            return getEnergyRegenRate(); // Now uses the unified rate function
         }
         
         function getTapPower() {
@@ -214,8 +220,64 @@
             return 0;
         }
         
+        function getEnergyRegenRate() {
+            return 1 + energyRegenLevel; // Base 1/sec + boost levels
+        }
+        
+        function processOfflineProgress(lastTime) {
+            const now = Date.now();
+            const timePassed = now - lastTime; // milliseconds
+            const secondsPassed = timePassed / 1000;
+            const hoursPassed = timePassed / (1000 * 60 * 60);
+            
+            // === OFFLINE ENERGY REGENERATION ===
+            const energyToAdd = secondsPassed * getEnergyRegenRate();
+            energy = Math.min(energy + energyToAdd, getMaxEnergy());
+            
+            // === BOOST DETERIORATION ===
+            const deteriorationCycles = Math.floor(hoursPassed / BOOST_DETERIORATION_HOURS);
+            
+            if (deteriorationCycles > 0) {
+                let deteriorated = false;
+                
+                // Deteriorate each boost
+                if (tapPowerLevel > 1) {
+                    tapPowerLevel = Math.max(1, tapPowerLevel - deteriorationCycles);
+                    deteriorated = true;
+                }
+                if (maxEnergyLevel > 1) {
+                    maxEnergyLevel = Math.max(1, maxEnergyLevel - deteriorationCycles);
+                    deteriorated = true;
+                }
+                if (energyRegenLevel > 1) {
+                    energyRegenLevel = Math.max(1, energyRegenLevel - deteriorationCycles);
+                    deteriorated = true;
+                }
+                
+                // Re-apply boost calculations after deterioration
+                tapPower = getTapPower();
+                energy = Math.min(energy, getMaxEnergy());
+                
+                if (deteriorated) {
+                    // Show alert about deterioration
+                    const hoursAway = Math.floor(hoursPassed);
+                    tg.showAlert(
+                        `⚠️ Boost Deterioration!\n\n` +
+                        `You were away for ${hoursAway} hours.\n` +
+                        `Your boosts have deteriorated by ${deteriorationCycles} level(s).\n\n` +
+                        `Keep playing to maintain your boosts!`
+                    );
+                }
+            }
+            
+            return {
+                energyAdded: energyToAdd,
+                deteriorationCycles: deteriorationCycles
+            };
+        }
+        
         // Load from cloud storage
-        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards'], (err, values) => {
+        tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime'], (err, values) => {
             if (!err && values) {
                 const savedVersion = parseInt(values.gameVersion) || 1;
                 
@@ -256,7 +318,17 @@
                     } catch (e) {
                         unlockedCards = [];
                     }
+                    
+                    // Process offline progress (energy regen + boost deterioration)
+                    const savedTime = parseInt(values.lastSaveTime) || Date.now();
+                    if (savedTime < Date.now() - 5000) { // Only if away for more than 5 seconds
+                        processOfflineProgress(savedTime);
+                    }
                 }
+                
+                // Update current time
+                lastSaveTime = Date.now();
+                lastBoostCheckTime = Date.now();
                 
                 // Apply boosts
                 tapPower = getTapPower();
@@ -305,6 +377,7 @@
         
         setInterval(() => { 
             if (!isLoading) { 
+                lastSaveTime = Date.now();
                 tg.CloudStorage.setItem('score', String(score));
                 tg.CloudStorage.setItem('tapPower', String(tapPower));
                 tg.CloudStorage.setItem('totalTaps', String(totalTaps));
@@ -314,6 +387,7 @@
                 tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
                 tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
                 tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+                tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
             } 
         }, 30000);
         
@@ -516,8 +590,10 @@
             unlockedCards.push(cardId);
             
             // Save to cloud storage
+            lastSaveTime = Date.now();
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+            tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
             
             // Update UI
             updateUI();
@@ -670,6 +746,22 @@
                 return;
             }
             
+            // Check boost level cap
+            const hasCard1 = unlockedCards.includes(1);
+            let currentLevel = 0;
+            if (type === 'tap') currentLevel = tapPowerLevel;
+            if (type === 'energy') currentLevel = maxEnergyLevel;
+            if (type === 'regen') currentLevel = energyRegenLevel;
+            
+            if (!hasCard1 && currentLevel >= BOOST_LEVEL_CAP_WITHOUT_CARD) {
+                tg.showAlert(
+                    `🔒 Boost Level Cap Reached!\n\n` +
+                    `You need to unlock Card #1 to upgrade beyond level ${BOOST_LEVEL_CAP_WITHOUT_CARD}.\n\n` +
+                    `Check the UNLOCKS tab to purchase cards!`
+                );
+                return;
+            }
+            
             score -= cost;
             
             if (type === 'tap') {
@@ -689,6 +781,9 @@
                 document.getElementById('regen-cost').innerText = getBoostCost('regen').toLocaleString();
             }
             
+            // Reset deterioration timer when buying boost
+            lastBoostCheckTime = Date.now();
+            
             // Save boosts
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPowerLevel', String(tapPowerLevel));
@@ -696,6 +791,7 @@
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+            tg.CloudStorage.setItem('lastSaveTime', String(Date.now()));
             
             tg.HapticFeedback.notificationOccurred('success');
             updateUI();
@@ -708,6 +804,8 @@
             btn.innerText = "💾 SAVING...";
             btn.disabled = true;
             
+            lastSaveTime = Date.now();
+            
             // Save to cloud storage
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
@@ -718,6 +816,7 @@
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+            tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
             
             // Wait a bit for cloud storage to complete
             setTimeout(() => {
@@ -746,6 +845,7 @@
         }
         
         window.addEventListener('beforeunload', () => {
+            lastSaveTime = Date.now();
             tg.CloudStorage.setItem('score', String(score));
             tg.CloudStorage.setItem('tapPower', String(tapPower));
             tg.CloudStorage.setItem('totalTaps', String(totalTaps));
@@ -755,6 +855,7 @@
             tg.CloudStorage.setItem('energyRegenLevel', String(energyRegenLevel));
             tg.CloudStorage.setItem('gameVersion', String(GAME_VERSION));
             tg.CloudStorage.setItem('unlockedCards', JSON.stringify(unlockedCards));
+            tg.CloudStorage.setItem('lastSaveTime', String(lastSaveTime));
         });
     </script>
 </body>
