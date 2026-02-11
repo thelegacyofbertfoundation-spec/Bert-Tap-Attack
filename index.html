@@ -53,7 +53,7 @@
         #energy-label { font-size: 0.85rem; color: #bbb; margin-bottom: 5px; }
         #energy-container { width: 90%; max-width: 400px; background: #333; height: 14px; border-radius: 10px; overflow: hidden; border: 2px solid #444; }
         #energy-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f39c12 0%, #f1c40f 100%); transition: width 0.2s; }
-        .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 14px 20px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; }
+        .btn { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white; border: none; padding: 12px 16px; border-radius: 30px; font-weight: bold; width: 90%; max-width: 400px; font-size: 0.85rem; cursor: pointer; transition: all 0.3s; }
         .btn:active { transform: scale(0.95); }
         .btn:disabled { opacity: 0.6; }
         .btn-small { padding: 12px 20px; font-size: 0.95rem; width: auto; min-width: 150px; }
@@ -70,6 +70,14 @@
         .boost-level { color: #3498db; font-size: 0.85rem; }
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; z-index: 1000; font-size: 1.5rem; }
         .hidden { display: none !important; }
+        
+        /* CAPTCHA Modal */
+        #captcha-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 10000; }
+        #captcha-content { background: #2c3e50; padding: 30px; border-radius: 20px; text-align: center; max-width: 90%; }
+        #captcha-question { font-size: 1.3rem; margin-bottom: 20px; color: #ecf0f1; font-weight: bold; }
+        #captcha-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .captcha-option { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; border: none; padding: 20px; border-radius: 15px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        .captcha-option:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -122,8 +130,8 @@
             </div>
         </div>
         
-        <img src="coin.png" id="coin-icon">
-        <div id="score">0</div>
+        <img src="coin.png" id="coin-icon" style="width: 40px; height: 40px; vertical-align: middle; margin-right: 5px;">
+        <div id="score" style="display: inline-block; vertical-align: middle;">0</div>
     </div>
     <div id="game-area"><img id="face" src="face.png"></div>
     <div class="footer">
@@ -190,6 +198,20 @@
         <button class="btn" id="refill-btn" onclick="toggleRefills()">⚡ REFILL</button>
         <button class="btn" id="sync-btn" onclick="syncAndRank()">💾 SYNC & RANK</button>
     </div>
+    
+    <!-- CAPTCHA Modal -->
+    <div id="captcha-modal">
+        <div id="captcha-content">
+            <div id="captcha-question">Select the LARGER number:</div>
+            <div id="captcha-options">
+                <button class="captcha-option" onclick="checkCaptcha(0)"></button>
+                <button class="captcha-option" onclick="checkCaptcha(1)"></button>
+                <button class="captcha-option" onclick="checkCaptcha(2)"></button>
+                <button class="captcha-option" onclick="checkCaptcha(3)"></button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); 
@@ -199,6 +221,8 @@
         const GAME_VERSION = 4; // Changed from 3 - triggers full reset
         
         let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
+        let tapsSinceCaptcha = 0; // Track taps for CAPTCHA
+        const CAPTCHA_INTERVAL = 2000; // CAPTCHA every 2000 taps
         const MAX_ENERGY = 1000;
         
         // Advanced Anti-cheat system (relaxed for better UX)
@@ -230,8 +254,8 @@
         let maxEnergyLevel = 1;
         let energyRegenLevel = 1;
         let lastSaveTime = Date.now(); // Track when game was last saved
-        let lastTapPowerCheckTime = Date.now(); // Track tap power deterioration
-        let lastEnergyRegenCheckTime = Date.now(); // Track energy regen deterioration
+        let lastTapPowerCheckTime = 0; // Start at 0 so timer shows as expired for new users
+        let lastEnergyRegenCheckTime = 0; // Start at 0 so timer shows as expired for new users
         // Note: Max Energy doesn't deteriorate separately, only the other two
         
         // Card unlock system
@@ -362,6 +386,61 @@
             return false;
         }
         
+        // CAPTCHA System
+        let captchaCorrectAnswer = 0;
+        let captchaActive = false;
+        
+        function showCaptcha() {
+            captchaActive = true;
+            const modal = document.getElementById('captcha-modal');
+            const options = document.querySelectorAll('.captcha-option');
+            
+            // Generate random numbers
+            const numbers = [];
+            for (let i = 0; i < 4; i++) {
+                numbers.push(Math.floor(Math.random() * 90) + 10); // 10-99
+            }
+            
+            // Find the largest number
+            captchaCorrectAnswer = 0;
+            let maxNum = numbers[0];
+            for (let i = 1; i < numbers.length; i++) {
+                if (numbers[i] > maxNum) {
+                    maxNum = numbers[i];
+                    captchaCorrectAnswer = i;
+                }
+            }
+            
+            // Display numbers
+            options.forEach((btn, i) => {
+                btn.textContent = numbers[i];
+            });
+            
+            // Show modal
+            modal.style.display = 'flex';
+            tg.HapticFeedback.notificationOccurred('warning');
+        }
+        
+        function checkCaptcha(selected) {
+            const modal = document.getElementById('captcha-modal');
+            
+            if (selected === captchaCorrectAnswer) {
+                // Correct!
+                modal.style.display = 'none';
+                captchaActive = false;
+                tapsSinceCaptcha = 0;
+                tg.HapticFeedback.notificationOccurred('success');
+                tg.showAlert("✅ Verification successful!\n\nKeep tapping!");
+            } else {
+                // Wrong answer - flag as cheater
+                tg.HapticFeedback.notificationOccurred('error');
+                isFlagged = true;
+                score = 0;
+                modal.style.display = 'none';
+                tg.showAlert("🚫 CAPTCHA FAILED!\n\nWrong answer detected.\n\nYour account has been flagged.\nScore reset to zero.");
+            }
+        }
+        
         // Load from cloud storage
         tg.CloudStorage.getItems(['score', 'tapPower', 'totalTaps', 'energy', 'tapPowerLevel', 'maxEnergyLevel', 'energyRegenLevel', 'gameVersion', 'unlockedCards', 'lastSaveTime', 'lastTapPowerCheckTime', 'lastEnergyRegenCheckTime'], (err, values) => {
             if (!err && values) {
@@ -482,7 +561,8 @@
             }
             
             // Check if tap power timer expired
-            if (tapTimeRemaining === 0 && tapPowerLevel > 1) {
+            // Only deteriorate if timer was actually set (not 0) and level is above 1
+            if (tapTimeRemaining === 0 && tapPowerLevel > 1 && lastTapPowerCheckTime > 0) {
                 tapPowerLevel = Math.max(1, tapPowerLevel - 1);
                 lastTapPowerCheckTime = Date.now();
                 tapPower = getTapPower();
@@ -515,7 +595,8 @@
             }
             
             // Check if energy regen timer expired
-            if (regenTimeRemaining === 0 && energyRegenLevel > 1) {
+            // Only deteriorate if timer was actually set (not 0) and level is above 1
+            if (regenTimeRemaining === 0 && energyRegenLevel > 1 && lastEnergyRegenCheckTime > 0) {
                 energyRegenLevel = Math.max(1, energyRegenLevel - 1);
                 lastEnergyRegenCheckTime = Date.now();
                 
@@ -713,6 +794,13 @@
                 score += tapPower;
                 energy -= 1;
                 totalTaps += 1;
+                tapsSinceCaptcha += 1;
+                
+                // Check if CAPTCHA needed (every 2000 taps)
+                if (tapsSinceCaptcha >= CAPTCHA_INTERVAL && !captchaActive) {
+                    showCaptcha();
+                    return; // Stop processing until CAPTCHA is solved
+                }
                 
                 tg.HapticFeedback.impactOccurred('medium');
                 
