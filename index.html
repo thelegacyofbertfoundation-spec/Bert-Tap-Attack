@@ -201,10 +201,10 @@
         let score = 0, tapPower = 1, energy = 1000, totalTaps = 0, isLoading = true;
         const MAX_ENERGY = 1000;
         
-        // Advanced Anti-cheat system
-        const MAX_TAPS_PER_SECOND = 15; // Humanly possible max
-        const MIN_TAP_INTERVAL = 30; // Minimum 30ms between taps (33 taps/sec absolute max)
-        const VARIANCE_THRESHOLD = 10; // Bot detection: variance below this = suspicious
+        // Advanced Anti-cheat system (relaxed for better UX)
+        const MAX_TAPS_PER_SECOND = 20; // Increased from 15 - allow faster legit tapping
+        const MIN_TAP_INTERVAL = 25; // Reduced from 30ms - allow slightly faster taps
+        const VARIANCE_THRESHOLD = 5; // Reduced from 10 - only catch extremely consistent bots
         const PATTERN_CHECK_SIZE = 20; // Number of taps to analyze for patterns
         
         let tapTimestamps = [];
@@ -214,12 +214,12 @@
         
         // Position-based anti-cheat (prevent same-spot auto-clickers)
         let lastTapPositions = []; // Track last 2 tap positions for same-spot detection
-        const MAX_SAME_POSITION_TAPS = 2; // Only allow 2 consecutive taps in same spot
+        const MAX_SAME_POSITION_TAPS = 5; // Increased from 2 - allow more taps in same area
         
         // Pattern detection (detect repeating sequences)
         let tapPositionHistory = []; // Track last 20 positions for pattern analysis
         const PATTERN_HISTORY_SIZE = 20;
-        const MIN_PATTERN_LENGTH = 3; // Minimum sequence length to detect
+        const MIN_PATTERN_LENGTH = 4; // Increased from 3 - only catch longer patterns
         const MAX_PATTERN_LENGTH = 8; // Maximum sequence length to check
         
         // Face animation
@@ -329,7 +329,7 @@
                 return false; // Not enough data
             }
             
-            // Try different pattern lengths (3, 4, 5, 6, 7, 8 positions)
+            // Try different pattern lengths (4, 5, 6, 7, 8 positions)
             for (let patternLen = MIN_PATTERN_LENGTH; patternLen <= MAX_PATTERN_LENGTH; patternLen++) {
                 if (positions.length < patternLen * 2) continue;
                 
@@ -342,19 +342,19 @@
                 // Compare the two segments
                 let matchCount = 0;
                 for (let i = 0; i < patternLen; i++) {
-                    // Allow small position variance (within 5 pixels)
+                    // Allow larger position variance (within 15 pixels, increased from 5)
                     const [x1, y1] = recentPattern[i].split(',').map(Number);
                     const [x2, y2] = previousSegment[i].split(',').map(Number);
                     
                     const distance = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
                     
-                    if (distance < 5) { // Within 5 pixels = same position
+                    if (distance < 15) { // Within 15 pixels = same position (increased from 5)
                         matchCount++;
                     }
                 }
                 
-                // If 80% or more positions match, it's a repeating pattern
-                if (matchCount >= patternLen * 0.8) {
+                // If 90% or more positions match, it's a repeating pattern (increased from 80%)
+                if (matchCount >= patternLen * 0.9) {
                     return true;
                 }
             }
@@ -572,9 +572,14 @@
                     if (tapTimestamps.length > MAX_TAPS_PER_SECOND) {
                         suspiciousActivityCount++;
                         tg.HapticFeedback.notificationOccurred('error');
-                        tg.showAlert("⚠️ Tapping too fast! Slow down.");
                         
-                        if (suspiciousActivityCount >= 3) {
+                        // Only warn after 5 violations (not 3)
+                        if (suspiciousActivityCount >= 5) {
+                            tg.showAlert("⚠️ Tapping too fast! Slow down a bit.");
+                        }
+                        
+                        // Only flag after 8 violations (not 3)
+                        if (suspiciousActivityCount >= 8) {
                             isFlagged = true;
                             score = 0;
                             tg.showAlert("🚫 AUTO-TAPPER DETECTED!\n\nYour account has been flagged.\nScore reset to zero.");
@@ -586,11 +591,12 @@
                     const timeSinceLastTap = now - lastTapTime;
                     if (lastTapTime > 0 && timeSinceLastTap < MIN_TAP_INTERVAL) {
                         suspiciousActivityCount++;
-                        tg.HapticFeedback.notificationOccurred('error');
                         
-                        if (suspiciousActivityCount >= 5) {
+                        // Only flag after 10 violations (not 5)
+                        if (suspiciousActivityCount >= 10) {
                             isFlagged = true;
                             score = 0;
+                            tg.HapticFeedback.notificationOccurred('error');
                             tg.showAlert("🚫 IMPOSSIBLE TAP SPEED DETECTED!\n\nYour account has been flagged.\nScore reset to zero.");
                         }
                         return;
@@ -612,10 +618,12 @@
                             
                             // Bots have very consistent intervals (low variance)
                             // Humans naturally vary between 50-200ms variance
-                            if (variance < VARIANCE_THRESHOLD && avgInterval < 100) {
+                            // Only flag extremely consistent patterns (variance < 5ms)
+                            if (variance < VARIANCE_THRESHOLD && avgInterval < 80) {
                                 suspiciousActivityCount += 2;
                                 
-                                if (suspiciousActivityCount >= 3) {
+                                // Only flag after 6 detections (not 3)
+                                if (suspiciousActivityCount >= 6) {
                                     isFlagged = true;
                                     score = 0;
                                     tg.showAlert("🚫 BOT PATTERN DETECTED!\n\nPerfectly consistent tapping is not human.\n\nYour account has been flagged.\nScore reset to zero.");
@@ -631,19 +639,25 @@
                     const tapY = Math.round(e.clientY);
                     const currentPosition = `${tapX},${tapY}`;
                     
-                    // Check if last 2 taps were in exact same position
+                    // Check if last 5 taps were in exact same position (increased from 2)
                     if (lastTapPositions.length >= MAX_SAME_POSITION_TAPS) {
                         const allSamePosition = lastTapPositions.every(pos => pos === currentPosition);
                         
                         if (allSamePosition) {
                             suspiciousActivityCount += 2;
-                            tg.HapticFeedback.notificationOccurred('error');
-                            tg.showAlert("⚠️ Same position detected!\n\nMove your finger around the screen.");
                             
-                            if (suspiciousActivityCount >= 4) {
+                            // Only flag after 8 violations (not 4)
+                            if (suspiciousActivityCount >= 8) {
                                 isFlagged = true;
                                 score = 0;
+                                tg.HapticFeedback.notificationOccurred('error');
                                 tg.showAlert("🚫 AUTO-CLICKER DETECTED!\n\nTapping in exact same spot repeatedly.\n\nYour account has been flagged.\nScore reset to zero.");
+                            } else {
+                                // Only warn on first few times
+                                if (suspiciousActivityCount <= 4) {
+                                    tg.HapticFeedback.notificationOccurred('warning');
+                                    tg.showAlert("⚠️ Move your finger around!\n\nTapping in the same spot looks suspicious.");
+                                }
                             }
                             return;
                         }
@@ -666,22 +680,21 @@
                     if (tapPositionHistory.length >= MIN_PATTERN_LENGTH * 2) {
                         if (detectRepeatingPattern(tapPositionHistory)) {
                             suspiciousActivityCount += 3;
-                            tg.HapticFeedback.notificationOccurred('error');
                             
-                            if (suspiciousActivityCount >= 3) {
+                            // Only flag after 9 violations (not 3)
+                            if (suspiciousActivityCount >= 9) {
                                 isFlagged = true;
                                 score = 0;
+                                tg.HapticFeedback.notificationOccurred('error');
                                 tg.showAlert("🚫 MACRO PATTERN DETECTED!\n\nRepeating tap sequence detected.\n\nYour account has been flagged.\nScore reset to zero.");
-                                return;
-                            } else {
-                                tg.showAlert("⚠️ Suspicious pattern detected!\n\nVary your tap positions more.");
                                 return;
                             }
                         }
                     }
                     
-                    // Decay suspicious activity counter over time (forgive minor issues)
-                    if (suspiciousActivityCount > 0 && Math.random() < 0.1) {
+                    // Aggressive forgiveness system - decay suspicious activity counter
+                    // 30% chance per tap to reduce counter (increased from 10%)
+                    if (suspiciousActivityCount > 0 && Math.random() < 0.3) {
                         suspiciousActivityCount = Math.max(0, suspiciousActivityCount - 1);
                     }
                     
