@@ -187,6 +187,9 @@
         let lastTapPositions = []; // Track last 2 tap positions
         const MAX_SAME_POSITION_TAPS = 2; // Only allow 2 consecutive taps in same spot
         
+        // Face animation
+        let currentFace = 'face.png'; // Track which face is showing
+        
         // Boost system
         let tapPowerLevel = 1;
         let maxEnergyLevel = 1;
@@ -510,9 +513,14 @@
                 
                 tg.HapticFeedback.impactOccurred('medium');
                 
-                // Flash effect
+                // Flash effect + alternate face images
                 const face = document.getElementById('face');
                 face.classList.add('flash');
+                
+                // Alternate between face.png and face_1.png
+                currentFace = (currentFace === 'face.png') ? 'face_1.png' : 'face.png';
+                face.src = currentFace;
+                
                 setTimeout(() => face.classList.remove('flash'), 200);
                 
                 const effect = document.createElement('div');
